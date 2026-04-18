@@ -3,48 +3,36 @@ import mapboxgl from 'mapbox-gl'
 import { useFleetStore } from '../../store/fleetStore'
 import type { Driver } from '../../types'
 
-const STATUS_COLORS = {
-  driving: '#f59e0b',
-  idle: '#eab308',
-  off_duty: '#6b7280',
+const STATUS_COLORS: Record<string, string> = {
+  driving: '#10b981',
+  idle: '#f59e0b',
+  off_duty: '#94a3b8',
 }
 
-function createTruckElement(driver: Driver, isSelected: boolean): HTMLDivElement {
+function createMarkerEl(driver: Driver, isSelected: boolean): HTMLDivElement {
+  const color = STATUS_COLORS[driver.status]
+  const initials = driver.name.split(' ').map((n) => n[0]).join('')
+
   const el = document.createElement('div')
-  el.className = 'truck-marker'
   el.style.cssText = `
-    width: 40px;
-    height: 40px;
-    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: ${isSelected ? color : 'white'};
+    border: 3px solid ${color};
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.3s ease;
-    transform: rotate(${driver.location.heading}deg);
+    font-size: 11px;
+    font-weight: 700;
+    color: ${isSelected ? 'white' : color};
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    transition: all 0.2s ease;
+    font-family: system-ui, sans-serif;
+    ${driver.status === 'driving' ? 'animation: markerPulse 2s ease-in-out infinite;' : ''}
   `
-
-  const color = STATUS_COLORS[driver.status]
-  const glow = driver.status === 'driving' ? `drop-shadow(0 0 8px ${color})` : 'none'
-  const pulse = driver.status === 'driving' ? 'truck-pulse' : ''
-
-  el.innerHTML = `
-    <div class="${pulse}" style="
-      width: 36px;
-      height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      background: ${isSelected ? 'rgba(245,158,11,0.2)' : 'rgba(0,0,0,0.5)'};
-      border: 2px solid ${isSelected ? color : 'transparent'};
-      filter: ${glow};
-      transition: all 0.3s ease;
-    ">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="${color}" xmlns="http://www.w3.org/2000/svg">
-        <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
-      </svg>
-    </div>
-  `
+  el.textContent = initials
   return el
 }
 
@@ -63,15 +51,13 @@ export function TruckMarkers({ map }: TruckMarkersProps) {
 
     for (const driver of drivers) {
       const isSelected = driver.driver_id === selectedDriverId
-      const el = createTruckElement(driver, isSelected)
-
-      el.addEventListener('click', () => {
+      const el = createMarkerEl(driver, isSelected)
+      el.addEventListener('click', (e) => {
+        e.stopPropagation()
         setSelectedDriver(driver.driver_id === selectedDriverId ? null : driver.driver_id)
       })
 
-      if (markersRef.current[driver.driver_id]) {
-        markersRef.current[driver.driver_id].remove()
-      }
+      markersRef.current[driver.driver_id]?.remove()
 
       const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
         .setLngLat([driver.location.lng, driver.location.lat])
@@ -87,11 +73,7 @@ export function TruckMarkers({ map }: TruckMarkersProps) {
     }
   }, [drivers, selectedDriverId])
 
-  useEffect(() => {
-    return () => {
-      Object.values(markersRef.current).forEach((m) => m.remove())
-    }
-  }, [])
+  useEffect(() => () => { Object.values(markersRef.current).forEach((m) => m.remove()) }, [])
 
   return null
 }
