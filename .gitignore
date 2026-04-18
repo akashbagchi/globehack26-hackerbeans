@@ -1,0 +1,27 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/app/**/__pycache__/
+backend/**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Env files
+.env
+backend/.env
+frontend/.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+*.sw?
