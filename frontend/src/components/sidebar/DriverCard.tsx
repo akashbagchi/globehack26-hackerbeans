@@ -1,62 +1,60 @@
+import { MapPin, Clock } from 'lucide-react'
 import { useFleetStore } from '../../store/fleetStore'
-import { StatusBadge } from './StatusBadge'
-import { HOSBar } from './HOSBar'
-import { FuelGauge } from './FuelGauge'
 import type { Driver } from '../../types'
+
+const STATUS_CONFIG = {
+  driving: { label: 'Driving', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
+  idle: { label: 'Idle', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
+  off_duty: { label: 'Off Duty', color: 'bg-gray-100 text-gray-500', dot: 'bg-gray-400' },
+}
+
+const AVATAR_COLORS = [
+  'bg-blue-500', 'bg-purple-500', 'bg-green-500',
+  'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-red-500', 'bg-indigo-500',
+]
 
 interface DriverCardProps {
   driver: Driver
+  index?: number
 }
 
-export function DriverCard({ driver }: DriverCardProps) {
+export function DriverCard({ driver, index = 0 }: DriverCardProps) {
   const selectedDriverId = useFleetStore((s) => s.selectedDriverId)
   const setSelectedDriver = useFleetStore((s) => s.setSelectedDriver)
   const isSelected = selectedDriverId === driver.driver_id
-
+  const cfg = STATUS_CONFIG[driver.status]
   const initials = driver.name.split(' ').map((n) => n[0]).join('')
+  const avatarBg = AVATAR_COLORS[index % AVATAR_COLORS.length]
 
   return (
     <div
       onClick={() => setSelectedDriver(isSelected ? null : driver.driver_id)}
-      className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
-        isSelected
-          ? 'bg-amber-400/10 border-amber-400/40 shadow-[0_0_12px_rgba(245,158,11,0.15)]'
-          : 'bg-gray-900/60 border-gray-700/50 hover:border-gray-600 hover:bg-gray-900/80'
+      className={`px-4 py-3 border-b border-gray-50 cursor-pointer transition-colors ${
+        isSelected ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-50'
       }`}
     >
-      <div className="flex items-start gap-2.5 mb-2.5">
-        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-          isSelected ? 'bg-amber-400/20 text-amber-300' : 'bg-gray-700 text-gray-300'
-        }`}>
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-full ${avatarBg} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
           {initials}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-1">
-            <span className={`text-sm font-semibold truncate ${isSelected ? 'text-amber-300' : 'text-gray-200'}`}>
-              {driver.name}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-gray-800 truncate">{driver.name}</span>
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${cfg.color}`}>
+              {cfg.label}
             </span>
-            <StatusBadge status={driver.status} />
           </div>
-          <div className="text-[11px] text-gray-500 mt-0.5">
-            {driver.truck_number} · {driver.location.city}, {driver.location.state}
+          <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-400">
+            <span className="flex items-center gap-1">
+              <MapPin size={10} />
+              {driver.location.city}, {driver.location.state}
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock size={10} />
+              {driver.hos.drive_remaining_hrs.toFixed(1)}h HOS
+            </span>
           </div>
         </div>
-      </div>
-
-      <div className="space-y-1.5">
-        <HOSBar remaining={driver.hos.drive_remaining_hrs} />
-        <FuelGauge level={driver.vehicle.fuel_level_pct} />
-      </div>
-
-      <div className="mt-2.5 flex items-center justify-between text-[10px]">
-        <span className="text-gray-500">${driver.economics.cost_per_mile}/mi</span>
-        {driver.current_load ? (
-          <span className="text-gray-500 truncate max-w-[120px]">
-            → {driver.current_load.destination.split(',')[0]}
-          </span>
-        ) : (
-          <span className="text-gray-600 italic">No active load</span>
-        )}
       </div>
     </div>
   )
