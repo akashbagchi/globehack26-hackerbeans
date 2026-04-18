@@ -36,18 +36,12 @@ export function SimulateButton({ pickup, destination }: SimulateButtonProps) {
     <button
       onClick={handleSimulate}
       disabled={!selectedMatchId || isSimulating}
-      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-bold text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
+      className="w-full py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
     >
       {isSimulating ? (
-        <>
-          <span className="w-4 h-4 border-2 border-indigo-400/40 border-t-indigo-300 rounded-full animate-spin" />
-          Simulating...
-        </>
+        <><span className="w-4 h-4 border-2 border-indigo-300 border-t-white rounded-full animate-spin" />Simulating...</>
       ) : (
-        <>
-          <span>⟳</span>
-          Simulate Assignment
-        </>
+        '⟳ Simulate Assignment'
       )}
     </button>
   )
