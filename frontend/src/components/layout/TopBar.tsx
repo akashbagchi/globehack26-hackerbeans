@@ -1,46 +1,64 @@
+import { Map, BarChart2 } from 'lucide-react'
 import { useFleetStore } from '../../store/fleetStore'
+import { useUIStore } from '../../store/uiStore'
 
 export function TopBar() {
   const drivers = useFleetStore((s) => s.drivers)
-  const lastUpdated = useFleetStore((s) => s.lastUpdated)
   const dataSource = useFleetStore((s) => s.dataSource)
-
+  const activePanel = useUIStore((s) => s.activePanel)
+  const setActivePanel = useUIStore((s) => s.setActivePanel)
   const activeCount = drivers.filter((d) => d.status === 'driving').length
-  const totalMiles = drivers.reduce((sum, d) => sum + d.economics.miles_today, 0)
-  const avgCpm = drivers.length
-    ? (drivers.reduce((s, d) => s + d.economics.cost_per_mile, 0) / drivers.length).toFixed(2)
-    : '--'
-
-  const timeStr = lastUpdated
-    ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : '--:--'
 
   return (
-    <div className="h-12 bg-gray-950 border-b border-gray-800 flex items-center px-4 gap-6 shrink-0 z-10">
+    <div className="h-12 bg-white border-b border-gray-200 flex items-center px-4 gap-6 shrink-0 z-10 shadow-sm">
       <div className="flex items-center gap-2">
-        <span className="text-lg font-black tracking-[0.15em] text-amber-400">SAURON</span>
-        <span className="text-[9px] text-gray-600 uppercase tracking-widest hidden sm:block">Fleet Digital Twin</span>
+        <div className="w-7 h-7 bg-amber-500 rounded-lg flex items-center justify-center">
+          <span className="text-white text-xs font-black">S</span>
+        </div>
+        <span className="text-sm font-bold text-gray-800 tracking-wide">SAURON</span>
       </div>
 
-      <div className="flex items-center gap-4 ml-auto text-[11px]">
-        <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-gray-400"><span className="text-green-400 font-bold">{activeCount}</span> active</span>
-        </div>
-        <div className="text-gray-600 hidden md:block">
-          <span className="text-gray-400 font-medium">{totalMiles.toLocaleString()}</span> mi today
-        </div>
-        <div className="text-gray-600 hidden md:block">
-          avg <span className="text-amber-400 font-medium">${avgCpm}</span>/mi
-        </div>
-        <div className="text-gray-700 hidden lg:block">{timeStr}</div>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => setActivePanel('dispatch')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            activePanel === 'dispatch'
+              ? 'bg-blue-50 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <Map size={14} />
+          Map
+        </button>
+        <button
+          onClick={() => setActivePanel('costs')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            activePanel === 'costs'
+              ? 'bg-blue-50 text-blue-600'
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          <BarChart2 size={14} />
+          Reports
+        </button>
+      </div>
+
+      <div className="ml-auto flex items-center gap-3 text-xs text-gray-500">
+        <span>
+          <span className="text-green-600 font-semibold">{activeCount}</span> active drivers
+        </span>
         {dataSource && (
-          <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
-            dataSource === 'mock' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+            dataSource === 'mock'
+              ? 'bg-blue-100 text-blue-600'
+              : 'bg-green-100 text-green-600'
           }`}>
-            {dataSource === 'mock' ? 'DEMO' : 'LIVE'}
+            {dataSource === 'mock' ? 'DEMO MODE' : 'LIVE'}
           </span>
         )}
+        <div className="w-7 h-7 rounded-full bg-amber-500 flex items-center justify-center text-white text-xs font-bold">
+          D
+        </div>
       </div>
     </div>
   )
