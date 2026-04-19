@@ -35,6 +35,9 @@ export function DriverCard({ driver, index = 0 }: DriverCardProps) {
   const cfg = STATUS_CONFIG[driver.status] ?? STATUS_CONFIG.unavailable
   const initials = driver.name.split(' ').map((n) => n[0]).join('')
   const avatarBg = AVATAR_COLORS[index % AVATAR_COLORS.length]
+  const readiness = driver.readiness ?? { state: 'unknown', score: 0, blocker_reasons: [] }
+  const trailerType = driver.vehicle?.trailer_type?.replace('_', ' ') ?? 'unknown'
+  const capacity = driver.vehicle?.capacity_lbs ?? 0
 
   return (
     <div
@@ -65,11 +68,11 @@ export function DriverCard({ driver, index = 0 }: DriverCardProps) {
             </span>
           </div>
           <div className="flex items-center gap-2 mt-2 text-[10px]">
-            <span className={`px-2 py-0.5 rounded-full font-semibold ${READINESS_CONFIG[driver.readiness.state] ?? 'text-gray-700 bg-gray-100'}`}>
-              {driver.readiness.state.replace('_', ' ')} · {driver.readiness.score}
+            <span className={`px-2 py-0.5 rounded-full font-semibold ${READINESS_CONFIG[readiness.state] ?? 'text-gray-700 bg-gray-100'}`}>
+              {readiness.state.replace('_', ' ')} · {readiness.score}
             </span>
             <span className="text-[#5f6368] truncate">
-              {driver.vehicle.trailer_type.replace('_', ' ')} · {driver.vehicle.capacity_lbs.toLocaleString()} lbs
+              {trailerType} · {capacity.toLocaleString()} lbs
             </span>
           </div>
         </div>

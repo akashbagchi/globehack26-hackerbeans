@@ -50,7 +50,26 @@ export function DriverDetail() {
   const cfg = STATUS_CONFIG[driver.status] ?? STATUS_CONFIG.unavailable
   const avatarBg = AVATAR_COLORS[driverIndex % AVATAR_COLORS.length]
   const initials = driver.name.split(' ').map((n) => n[0]).join('')
-  const readinessStyle = READINESS_CONFIG[driver.readiness.state] ?? 'text-gray-700 bg-gray-50 border border-gray-200'
+  const readiness = driver.readiness ?? { state: 'unknown', score: 0, blocker_reasons: [], available_at: null }
+  const availabilityWindow = driver.availability_window ?? {
+    available_from: new Date().toISOString(),
+    available_until: new Date().toISOString(),
+  }
+  const contractConstraints = driver.contract_constraints ?? {
+    max_deadhead_miles: 0,
+    preferred_regions: [],
+    excluded_cargo_types: [],
+  }
+  const vehicle = {
+    ...driver.vehicle,
+    capacity_lbs: driver.vehicle?.capacity_lbs ?? 0,
+    trailer_type: driver.vehicle?.trailer_type ?? 'unknown',
+    cab_type: driver.vehicle?.cab_type ?? 'unknown',
+    refrigerated: driver.vehicle?.refrigerated ?? false,
+    hazmat_permitted: driver.vehicle?.hazmat_permitted ?? false,
+    maintenance_ready: driver.vehicle?.maintenance_ready ?? true,
+  }
+  const readinessStyle = READINESS_CONFIG[readiness.state] ?? 'text-gray-700 bg-gray-50 border border-gray-200'
   const certifications = [...new Set([...(driver.certifications ?? []), ...(driver.endorsements ?? [])])]
 
   async function handleDispatch(e: React.FormEvent) {
@@ -124,27 +143,27 @@ export function DriverDetail() {
               <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Readiness</div>
               <div className="space-y-2">
                 <div className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${readinessStyle}`}>
-                  {driver.readiness.state.replace('_', ' ')} · score {driver.readiness.score}
+                  {readiness.state.replace('_', ' ')} · score {readiness.score}
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
                     <div className="text-[#5f6368]">Available Window</div>
                     <div className="font-medium text-[#202124]">
-                      {new Date(driver.availability_window.available_from).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      {new Date(availabilityWindow.available_from).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                       {' - '}
-                      {new Date(driver.availability_window.available_until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      {new Date(availabilityWindow.available_until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                     </div>
                   </div>
                   <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
                     <div className="text-[#5f6368]">Next Available</div>
                     <div className="font-medium text-[#202124]">
-                      {driver.readiness.available_at ? new Date(driver.readiness.available_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Now'}
+                      {readiness.available_at ? new Date(readiness.available_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Now'}
                     </div>
                   </div>
                 </div>
-                {driver.readiness.blocker_reasons.length > 0 && (
+                {readiness.blocker_reasons.length > 0 && (
                   <div className="space-y-1">
-                    {driver.readiness.blocker_reasons.map((reason) => (
+                    {readiness.blocker_reasons.map((reason) => (
                       <div key={reason} className="text-[11px] text-[#5f6368] bg-[#f8f9fa] border border-[#dadce0] rounded px-2 py-1">
                         {reason}
                       </div>
@@ -175,22 +194,22 @@ export function DriverDetail() {
             <div>
               <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Truck</div>
               <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-xs">
-                <div><span className="text-[#5f6368]">Fuel</span><div className="font-medium text-[#202124]">{driver.vehicle.fuel_level_pct}%</div></div>
-                <div><span className="text-[#5f6368]">MPG</span><div className="font-medium text-[#202124]">{driver.vehicle.mpg_avg}</div></div>
+                <div><span className="text-[#5f6368]">Fuel</span><div className="font-medium text-[#202124]">{vehicle.fuel_level_pct}%</div></div>
+                <div><span className="text-[#5f6368]">MPG</span><div className="font-medium text-[#202124]">{vehicle.mpg_avg}</div></div>
                 <div><span className="text-[#5f6368]">$/mi</span><div className="font-medium text-[#202124]">${driver.economics.cost_per_mile}</div></div>
-                <div><span className="text-[#5f6368]">Capacity</span><div className="font-medium text-[#202124]">{driver.vehicle.capacity_lbs.toLocaleString()} lbs</div></div>
-                <div><span className="text-[#5f6368]">Trailer</span><div className="font-medium text-[#202124]">{driver.vehicle.trailer_type.replace('_', ' ')}</div></div>
-                <div><span className="text-[#5f6368]">Cab</span><div className="font-medium text-[#202124]">{driver.vehicle.cab_type.replace('_', ' ')}</div></div>
+                <div><span className="text-[#5f6368]">Capacity</span><div className="font-medium text-[#202124]">{vehicle.capacity_lbs.toLocaleString()} lbs</div></div>
+                <div><span className="text-[#5f6368]">Trailer</span><div className="font-medium text-[#202124]">{vehicle.trailer_type.replace('_', ' ')}</div></div>
+                <div><span className="text-[#5f6368]">Cab</span><div className="font-medium text-[#202124]">{vehicle.cab_type.replace('_', ' ')}</div></div>
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
-                <span className={`text-[10px] px-2 py-1 rounded-full ${driver.vehicle.refrigerated ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                  {driver.vehicle.refrigerated ? 'Reefer Ready' : 'Dry Equipment'}
+                <span className={`text-[10px] px-2 py-1 rounded-full ${vehicle.refrigerated ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {vehicle.refrigerated ? 'Reefer Ready' : 'Dry Equipment'}
                 </span>
-                <span className={`text-[10px] px-2 py-1 rounded-full ${driver.vehicle.hazmat_permitted ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                  {driver.vehicle.hazmat_permitted ? 'Hazmat Permitted' : 'No Hazmat'}
+                <span className={`text-[10px] px-2 py-1 rounded-full ${vehicle.hazmat_permitted ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {vehicle.hazmat_permitted ? 'Hazmat Permitted' : 'No Hazmat'}
                 </span>
-                <span className={`text-[10px] px-2 py-1 rounded-full ${driver.vehicle.maintenance_ready ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                  {driver.vehicle.maintenance_ready ? 'Maintenance Ready' : 'Maintenance Hold'}
+                <span className={`text-[10px] px-2 py-1 rounded-full ${vehicle.maintenance_ready ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  {vehicle.maintenance_ready ? 'Maintenance Ready' : 'Maintenance Hold'}
                 </span>
               </div>
             </div>
@@ -207,16 +226,16 @@ export function DriverDetail() {
               <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
                 <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
                   <div className="text-[#5f6368]">Max Deadhead</div>
-                  <div className="font-medium text-[#202124]">{driver.contract_constraints.max_deadhead_miles} mi</div>
+                  <div className="font-medium text-[#202124]">{contractConstraints.max_deadhead_miles} mi</div>
                 </div>
                 <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
                   <div className="text-[#5f6368]">Preferred Regions</div>
-                  <div className="font-medium text-[#202124]">{driver.contract_constraints.preferred_regions.join(', ')}</div>
+                  <div className="font-medium text-[#202124]">{contractConstraints.preferred_regions.join(', ') || 'Not set'}</div>
                 </div>
               </div>
-              {driver.contract_constraints.excluded_cargo_types.length > 0 && (
+              {contractConstraints.excluded_cargo_types.length > 0 && (
                 <div className="mt-2 text-[11px] text-[#5f6368]">
-                  Excludes: {driver.contract_constraints.excluded_cargo_types.join(', ')}
+                  Excludes: {contractConstraints.excluded_cargo_types.join(', ')}
                 </div>
               )}
             </div>
