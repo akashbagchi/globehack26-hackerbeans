@@ -93,6 +93,69 @@ async def get_dispatch_recommendations(
         raise HTTPException(status_code=502, detail="AI service returned an unexpected response")
 
 
+async def enrich_recommendations_with_ai(
+    result: "DispatchRecommendation",
+) -> "DispatchRecommendation":
+    from app.models.ai import DispatchRecommendation, DriverRecommendation
+
+    if not result.recommendations:
+        return result
+
+    summary_lines = []
+    for rec in result.recommendations:
+        summary_lines.append(
+            f"- Rank {rec.rank}: {rec.driver_name} ({rec.driver_id}), "
+            f"score {rec.score}, {rec.distance_to_pickup_miles}mi deadhead, "
+            f"HOS {rec.hos_remaining_hrs}h, ${rec.cost_per_mile}/mi "
+            f"({rec.cost_delta_vs_avg:+.2f} vs avg). "
+            f"Scoring notes: {rec.reasoning}"
+        )
+    summary = "\n".join(summary_lines)
+
+    response = await client.messages.create(
+        model=MODEL,
+        max_tokens=512,
+        system=(
+            "You are Sauron, an AI dispatch intelligence. You are given deterministic scoring results "
+            "for driver-load matching. Rephrase each driver's scoring notes into a concise, natural-language "
+            "sentence a dispatcher would find useful. Do not change ranks or scores. "
+            "Return valid JSON only."
+        ),
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    f"Scoring results:\n{summary}\n\n"
+                    "Return JSON: {\"reasoning\": {\"<driver_id>\": \"One sentence.\", ...}}"
+                ),
+            }
+        ],
+    )
+
+    try:
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        data = json.loads(raw.strip())
+        reasoning_map = data.get("reasoning", {})
+    except (json.JSONDecodeError, IndexError, KeyError):
+        logger.warning("AI enrichment failed, keeping deterministic reasoning")
+        return result
+
+    enriched = []
+    for rec in result.recommendations:
+        if rec.driver_id in reasoning_map:
+            rec = rec.model_copy(update={"reasoning": reasoning_map[rec.driver_id]})
+        enriched.append(rec)
+
+    return DispatchRecommendation(
+        recommendations=enriched,
+        dispatch_note=result.dispatch_note,
+    )
+
+
 async def get_cost_insights(drivers: List[Driver]) -> dict:
     avg_cpm = sum(d.economics.cost_per_mile for d in drivers) / len(drivers)
     cost_rows = []

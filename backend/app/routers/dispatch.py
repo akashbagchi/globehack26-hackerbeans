@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from datetime import datetime, timezone
 from app.models.load import LoadRequest
 from app.services.navpro import get_drivers
-from app.services.claude import get_dispatch_recommendations, get_cost_insights
+from app.services.claude import get_cost_insights, enrich_recommendations_with_ai
 from app.services.eligibility import evaluate_driver_for_load
+from app.services.scoring import score_drivers
 from app.models.events import AssignmentDecisionEvent, AssignmentDecisionPayload
 from app.services.event_bus import event_bus
 from app.limiter import limiter
@@ -13,7 +14,11 @@ router = APIRouter(prefix="/dispatch", tags=["dispatch"])
 
 @router.post("/recommend")
 @limiter.limit("10/minute")
-async def recommend_dispatch(request: Request, req: LoadRequest):
+async def recommend_dispatch(
+    request: Request,
+    req: LoadRequest,
+    enrich_with_ai: bool = Query(default=False),
+):
     drivers, source = await get_drivers()
     evaluations = [
         evaluate_driver_for_load(driver, req.pickup, req.destination, req.cargo, req.weight_lbs)
@@ -45,15 +50,21 @@ async def recommend_dispatch(request: Request, req: LoadRequest):
                 "dispatch_note": "No eligible driver-truck pairs met the readiness, HOS, certification, and capacity checks.",
             },
             "source": source,
+            "scoring": "deterministic",
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
-    result = await get_dispatch_recommendations(
+    result = score_drivers(
         eligible_drivers, req.pickup, req.destination, req.cargo, req.weight_lbs
     )
+
+    if enrich_with_ai:
+        result = await enrich_recommendations_with_ai(result)
+
     return {
-        "data": result,
+        "data": result.model_dump(),
         "source": source,
+        "scoring": "deterministic",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
