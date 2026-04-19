@@ -5,6 +5,8 @@ from app.config import settings
 from app.models.driver import Driver
 from app.data.mock_seed import MOCK_DRIVERS
 
+AVG_SPEED_MPH = 55.0
+
 
 def _parse_mock_drivers() -> List[Driver]:
     return [Driver(**d) for d in MOCK_DRIVERS]

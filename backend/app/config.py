@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     use_mock_data: bool = True
     port: int = 8000
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
+    jwt_secret: str = "sauron-dev-secret-change-in-prod"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 12
 
     @property
     def cors_origins_list(self) -> list[str]:

@@ -232,3 +232,235 @@ MOCK_DRIVERS = [
         },
     },
 ]
+
+PROFILE_ENRICHMENTS = {
+    "DRV001": {
+        "certifications": ["cdl_class_a", "auto_parts"],
+        "endorsements": ["doubles_triples"],
+        "contract_constraints": {
+            "max_deadhead_miles": 420,
+            "preferred_regions": ["Midwest", "Great Lakes"],
+            "excluded_cargo_types": ["explosives"],
+        },
+        "availability_window": {
+            "available_from": "2026-04-18T06:00:00Z",
+            "available_until": "2026-04-18T20:00:00Z",
+        },
+        "readiness": {
+            "state": "assigned",
+            "score": 58,
+            "blocker_reasons": ["Currently handling LD-8821"],
+            "available_at": "2026-04-18T18:30:00Z",
+        },
+        "vehicle": {
+            "capacity_lbs": 46000,
+            "cab_type": "sleeper",
+            "trailer_type": "dry_van",
+            "trailer_length_ft": 53,
+            "refrigerated": False,
+            "maintenance_ready": True,
+            "hazmat_permitted": False,
+        },
+    },
+    "DRV002": {
+        "certifications": ["cdl_class_a", "twic", "electronics_secure"],
+        "endorsements": ["tanker"],
+        "contract_constraints": {
+            "max_deadhead_miles": 350,
+            "preferred_regions": ["Texas Triangle", "South"],
+            "excluded_cargo_types": ["explosives"],
+        },
+        "availability_window": {
+            "available_from": "2026-04-18T04:00:00Z",
+            "available_until": "2026-04-18T17:00:00Z",
+        },
+        "readiness": {
+            "state": "assigned",
+            "score": 61,
+            "blocker_reasons": ["Active linehaul assignment"],
+            "available_at": "2026-04-18T15:45:00Z",
+        },
+        "vehicle": {
+            "capacity_lbs": 44000,
+            "cab_type": "sleeper",
+            "trailer_type": "dry_van",
+            "trailer_length_ft": 53,
+            "refrigerated": False,
+            "maintenance_ready": True,
+            "hazmat_permitted": False,
+        },
+    },
+    "DRV003": {
+        "certifications": ["cdl_class_a", "hazmat", "twic", "military"],
+        "endorsements": ["hazmat", "tanker"],
+        "contract_constraints": {
+            "max_deadhead_miles": 500,
+            "preferred_regions": ["Mountain West", "Plains"],
+            "excluded_cargo_types": [],
+        },
+        "availability_window": {
+            "available_from": "2026-04-18T08:00:00Z",
+            "available_until": "2026-04-18T22:00:00Z",
+        },
+        "readiness": {
+            "state": "ready",
+            "score": 95,
+            "blocker_reasons": [],
+            "available_at": "2026-04-18T08:00:00Z",
+        },
+        "vehicle": {
+            "capacity_lbs": 48000,
+            "cab_type": "day_cab",
+            "trailer_type": "flatbed",
+            "trailer_length_ft": 48,
+            "refrigerated": False,
+            "maintenance_ready": True,
+            "hazmat_permitted": True,
+        },
+    },
+    "DRV004": {
+        "certifications": ["cdl_class_a", "refrigerated", "perishable_handling"],
+        "endorsements": ["refrigerated"],
+        "contract_constraints": {
+            "max_deadhead_miles": 250,
+            "preferred_regions": ["Southeast"],
+            "excluded_cargo_types": ["explosives"],
+        },
+        "availability_window": {
+            "available_from": "2026-04-18T02:00:00Z",
+            "available_until": "2026-04-19T08:00:00Z",
+        },
+        "readiness": {
+            "state": "at_risk",
+            "score": 46,
+            "blocker_reasons": ["Low HOS margin", "Assigned refrigerated produce load"],
+            "available_at": "2026-04-19T06:00:00Z",
+        },
+        "vehicle": {
+            "capacity_lbs": 45000,
+            "cab_type": "sleeper",
+            "trailer_type": "reefer",
+            "trailer_length_ft": 53,
+            "refrigerated": True,
+            "maintenance_ready": True,
+            "hazmat_permitted": False,
+        },
+    },
+    "DRV005": {
+        "certifications": ["cdl_class_a", "refrigerated", "perishable_handling"],
+        "endorsements": ["refrigerated"],
+        "contract_constraints": {
+            "max_deadhead_miles": 525,
+            "preferred_regions": ["Pacific Northwest", "West Coast"],
+            "excluded_cargo_types": ["explosives", "military"],
+        },
+        "availability_window": {
+            "available_from": "2026-04-18T07:30:00Z",
+            "available_until": "2026-04-18T23:00:00Z",
+        },
+        "readiness": {
+            "state": "ready",
+            "score": 91,
+            "blocker_reasons": [],
+            "available_at": "2026-04-18T07:30:00Z",
+        },
+        "vehicle": {
+            "capacity_lbs": 43000,
+            "cab_type": "sleeper",
+            "trailer_type": "reefer",
+            "trailer_length_ft": 53,
+            "refrigerated": True,
+            "maintenance_ready": True,
+            "hazmat_permitted": False,
+        },
+    },
+    "DRV006": {
+        "certifications": ["cdl_class_a", "hazmat"],
+        "endorsements": ["hazmat"],
+        "contract_constraints": {
+            "max_deadhead_miles": 300,
+            "preferred_regions": ["Southwest"],
+            "excluded_cargo_types": ["military"],
+        },
+        "availability_window": {
+            "available_from": "2026-04-18T05:00:00Z",
+            "available_until": "2026-04-18T21:00:00Z",
+        },
+        "readiness": {
+            "state": "assigned",
+            "score": 64,
+            "blocker_reasons": ["Current westbound delivery in progress"],
+            "available_at": "2026-04-18T20:00:00Z",
+        },
+        "vehicle": {
+            "capacity_lbs": 47000,
+            "cab_type": "sleeper",
+            "trailer_type": "dry_van",
+            "trailer_length_ft": 53,
+            "refrigerated": False,
+            "maintenance_ready": True,
+            "hazmat_permitted": True,
+        },
+    },
+    "DRV007": {
+        "certifications": ["cdl_class_a", "military"],
+        "endorsements": ["passenger"],
+        "contract_constraints": {
+            "max_deadhead_miles": 220,
+            "preferred_regions": ["Mid-South"],
+            "excluded_cargo_types": ["perishable", "refrigerated"],
+        },
+        "availability_window": {
+            "available_from": "2026-04-18T12:00:00Z",
+            "available_until": "2026-04-18T23:30:00Z",
+        },
+        "readiness": {
+            "state": "blocked",
+            "score": 22,
+            "blocker_reasons": ["Off duty reset in progress", "Truck maintenance hold"],
+            "available_at": "2026-04-18T12:00:00Z",
+        },
+        "vehicle": {
+            "capacity_lbs": 42000,
+            "cab_type": "day_cab",
+            "trailer_type": "dry_van",
+            "trailer_length_ft": 48,
+            "refrigerated": False,
+            "maintenance_ready": False,
+            "hazmat_permitted": False,
+        },
+    },
+    "DRV008": {
+        "certifications": ["cdl_class_a", "twic", "heavy_haul"],
+        "endorsements": ["tanker"],
+        "contract_constraints": {
+            "max_deadhead_miles": 360,
+            "preferred_regions": ["Ohio Valley", "Northeast"],
+            "excluded_cargo_types": [],
+        },
+        "availability_window": {
+            "available_from": "2026-04-18T05:30:00Z",
+            "available_until": "2026-04-18T18:30:00Z",
+        },
+        "readiness": {
+            "state": "assigned",
+            "score": 63,
+            "blocker_reasons": ["In-transit steel consignment"],
+            "available_at": "2026-04-18T16:00:00Z",
+        },
+        "vehicle": {
+            "capacity_lbs": 52000,
+            "cab_type": "sleeper",
+            "trailer_type": "flatbed",
+            "trailer_length_ft": 53,
+            "refrigerated": False,
+            "maintenance_ready": True,
+            "hazmat_permitted": False,
+        },
+    },
+}
+
+for driver in MOCK_DRIVERS:
+    enrichment = PROFILE_ENRICHMENTS[driver["driver_id"]]
+    driver.update({key: value for key, value in enrichment.items() if key != "vehicle"})
+    driver["vehicle"] = {**driver["vehicle"], **enrichment["vehicle"]}

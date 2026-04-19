@@ -7,6 +7,8 @@ const STATUS_COLOR: Record<string, string> = {
   driving: '#10b981',
   idle: '#f59e0b',
   off_duty: '#94a3b8',
+  unavailable: '#f97316',
+  breakdown: '#ef4444',
 }
 
 interface TruckMarkersProps {
@@ -74,26 +76,22 @@ function updateMarkerEl(el: HTMLElement, driver: Driver, color: string, isSelect
 }
 
 function applyStyles(el: HTMLDivElement, driver: Driver, color: string, isSelected: boolean) {
-  const size = isSelected ? 36 : 28
+  const size = isSelected ? 16 : 10
   const pulse = driver.status === 'driving'
 
-  el.style.cssText = `
-    width: ${size}px;
-    height: ${size}px;
-    border-radius: 50%;
-    background: ${color};
-    border: ${isSelected ? '3px' : '2px'} solid white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.35)${isSelected ? `, 0 0 0 3px ${color}55` : ''};
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: ${pulse ? 'markerPulse 2s ease-in-out infinite' : 'none'};
-    transition: width 0.15s, height 0.15s;
-    transform: rotate(${driver.location.heading}deg);
-  `
-
-  el.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-    <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>
-  </svg>`
+  // Set individual properties — never cssText — so we don't clobber the
+  // `transform: translate(...)` that Mapbox injects on this same element.
+  el.style.width = `${size}px`
+  el.style.height = `${size}px`
+  el.style.borderRadius = '50%'
+  el.style.background = color
+  el.style.border = `${isSelected ? '2.5px' : '1.5px'} solid white`
+  el.style.boxShadow = isSelected
+    ? `0 0 0 2px ${color}66, 0 1px 4px rgba(0,0,0,0.4)`
+    : '0 1px 3px rgba(0,0,0,0.35)'
+  el.style.cursor = 'pointer'
+  el.style.animation = pulse ? 'markerPulse 2s ease-in-out infinite' : 'none'
+  el.style.transition = 'width 0.15s, height 0.15s, box-shadow 0.15s'
+  // Dot only — no inner content needed
+  while (el.firstChild) el.removeChild(el.firstChild)
 }

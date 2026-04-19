@@ -2,15 +2,69 @@
 import { createClient } from '@insforge/sdk'
 import type { Driver, DriverRecommendation, InsightCard, CostChartEntry, SimulationResult, ChatMessage } from '../types'
 
+export function getToken(): string | null {
+  try {
+    const raw = localStorage.getItem('sauron-auth')
+    return raw ? JSON.parse(raw)?.state?.token ?? null : null
+  } catch { return null }
+}
+
 const insforge = createClient({
   baseUrl: process.env.NEXT_PUBLIC_INSFORGE_URL!,
   anonKey: process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!,
 })
 
+function normalizeDriver(raw: Partial<Driver> & Record<string, any>): Driver {
+  const status = raw.status ?? 'unavailable'
+  const currentLoad = raw.current_load ?? null
+
+  return {
+    ...raw,
+    status,
+    current_load: currentLoad,
+    certifications: raw.certifications ?? [],
+    endorsements: raw.endorsements ?? [],
+    contract_constraints: {
+      max_deadhead_miles: raw.contract_constraints?.max_deadhead_miles ?? 0,
+      preferred_regions: raw.contract_constraints?.preferred_regions ?? [],
+      excluded_cargo_types: raw.contract_constraints?.excluded_cargo_types ?? [],
+    },
+    availability_window: {
+      available_from: raw.availability_window?.available_from ?? new Date().toISOString(),
+      available_until: raw.availability_window?.available_until ?? new Date().toISOString(),
+    },
+    readiness: {
+      state: raw.readiness?.state ?? (currentLoad ? 'assigned' : status === 'idle' ? 'ready' : 'unknown'),
+      score: raw.readiness?.score ?? (currentLoad ? 60 : status === 'idle' ? 85 : 40),
+      blocker_reasons: raw.readiness?.blocker_reasons ?? [],
+      available_at: raw.readiness?.available_at ?? currentLoad?.eta ?? null,
+    },
+    vehicle: {
+      ...raw.vehicle,
+      capacity_lbs: raw.vehicle?.capacity_lbs ?? 0,
+      cab_type: raw.vehicle?.cab_type ?? 'unknown',
+      trailer_type: raw.vehicle?.trailer_type ?? 'unknown',
+      trailer_length_ft: raw.vehicle?.trailer_length_ft ?? 0,
+      refrigerated: raw.vehicle?.refrigerated ?? false,
+      maintenance_ready: raw.vehicle?.maintenance_ready ?? true,
+      hazmat_permitted: raw.vehicle?.hazmat_permitted ?? false,
+    },
+  } as Driver
+}
+
+export async function loginDispatcher(email: string, password: string) {
+  const { data, error } = await insforge.functions.invoke('auth-login', {
+    body: { email, password },
+  })
+  if (error) throw new Error('Invalid email or password')
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 export async function fetchDrivers(): Promise<{ drivers: Driver[]; source: string }> {
   const { data, error } = await insforge.database.from('drivers').select()
   if (error) throw new Error(String(error))
-  return { drivers: (data ?? []) as Driver[], source: 'insforge' }
+  return { drivers: (data ?? []).map((driver) => normalizeDriver(driver as Record<string, any>)), source: 'insforge' }
 }
 
 export async function fetchDispatchRecommendations(payload: {
@@ -48,9 +102,11 @@ function buildFleetSummary(drivers: Driver[]): string {
     const loadInfo = d.current_load
       ? `en route ${d.current_load.origin}→${d.current_load.destination}`
       : 'no load'
+    const certs = [...new Set([...(d.certifications ?? []), ...(d.endorsements ?? [])])].join(', ') || 'standard'
     return `- ${d.name} (${d.driver_id}): ${d.status}, ${d.location.city} ${d.location.state}, ` +
       `HOS ${d.hos.drive_remaining_hrs}h remain, fuel ${d.vehicle.fuel_level_pct}%, ` +
-      `$${d.economics.cost_per_mile}/mi, ${loadInfo}`
+      `$${d.economics.cost_per_mile}/mi, readiness ${d.readiness?.state ?? 'unknown'} (${d.readiness?.score ?? 0}), ` +
+      `capacity ${d.vehicle.capacity_lbs} lbs, certs [${certs}], ${loadInfo}`
   }).join('\n')
 }
 

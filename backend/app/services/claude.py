@@ -1,9 +1,13 @@
 import json
+import logging
 from typing import AsyncIterator, List
 import anthropic
+from fastapi import HTTPException
 from app.config import settings
 from app.models.driver import Driver
 from app.models.ai import ChatMessage
+
+logger = logging.getLogger(__name__)
 
 client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 MODEL = "claude-sonnet-4-6"
@@ -13,10 +17,12 @@ def _fleet_summary(drivers: List[Driver]) -> str:
     rows = []
     for d in drivers:
         load_info = f"en route {d.current_load.origin}→{d.current_load.destination}" if d.current_load else "no load"
+        certs = ", ".join(sorted(set(d.certifications + d.endorsements))) or "standard"
         rows.append(
             f"- {d.name} ({d.driver_id}): {d.status}, {d.location.city} {d.location.state}, "
             f"HOS {d.hos.drive_remaining_hrs}h remain, fuel {d.vehicle.fuel_level_pct}%, "
-            f"${d.economics.cost_per_mile}/mi, {load_info}"
+            f"${d.economics.cost_per_mile}/mi, readiness {d.readiness.state} ({d.readiness.score}), "
+            f"capacity {d.vehicle.capacity_lbs} lbs, certs [{certs}], {load_info}"
         )
     return "\n".join(rows)
 
@@ -60,8 +66,8 @@ async def get_dispatch_recommendations(
                             f"- Pickup: {pickup}\n"
                             f"- Destination: {destination}\n"
                             f"- Cargo: {cargo}, Weight: {weight_lbs} lbs\n\n"
-                            "Rank the top 3 most suitable available drivers. "
-                            "Consider: proximity to pickup, HOS remaining, cost per mile, current status. "
+                            "Rank the top 3 most suitable eligible drivers. "
+                            "Consider: proximity to pickup, HOS remaining, cost per mile, readiness, and equipment fit. "
                             "Return JSON: "
                             '{"recommendations": [{"rank": 1, "driver_id": "...", "driver_name": "...", '
                             '"score": 94, "distance_to_pickup_miles": 45.0, "hos_remaining_hrs": 8.5, '
@@ -75,12 +81,16 @@ async def get_dispatch_recommendations(
         ],
     )
 
-    raw = response.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return json.loads(raw.strip())
+    try:
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw.strip())
+    except (json.JSONDecodeError, IndexError, KeyError) as e:
+        logger.error("Failed to parse dispatch recommendation response: %s", e)
+        raise HTTPException(status_code=502, detail="AI service returned an unexpected response")
 
 
 async def get_cost_insights(drivers: List[Driver]) -> dict:
@@ -145,12 +155,16 @@ async def get_cost_insights(drivers: List[Driver]) -> dict:
         ],
     )
 
-    raw = response.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    insights_data = json.loads(raw.strip())
+    try:
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        insights_data = json.loads(raw.strip())
+    except (json.JSONDecodeError, IndexError, KeyError) as e:
+        logger.error("Failed to parse cost insights response: %s", e)
+        raise HTTPException(status_code=502, detail="AI service returned an unexpected response")
 
     return {"chart_data": chart_data, "insights": insights_data.get("insights", [])}
 
