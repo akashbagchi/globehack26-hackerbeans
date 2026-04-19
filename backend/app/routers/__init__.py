@@ -1,3 +1,3 @@
-from . import chat, dispatch, fleet, operations, simulate
+from . import chat, dispatch, events, fleet, operations, simulate
 
-__all__ = ["chat", "dispatch", "fleet", "operations", "simulate"]
+__all__ = ["chat", "dispatch", "events", "fleet", "operations", "simulate"]

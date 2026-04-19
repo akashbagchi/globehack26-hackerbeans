@@ -22,6 +22,7 @@ pyasn1==0.6.3
 pycparser==3.0
 pydantic==2.13.2
 pydantic-settings==2.13.1
+slowapi==0.1.9
 pydantic_core==2.46.2
 python-dotenv==1.2.2
 python-jose==3.5.0

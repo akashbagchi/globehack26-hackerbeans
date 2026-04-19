@@ -29,6 +29,10 @@ frontend/tsconfig.tsbuildinfo
 .idea/
 *.sw?
 
-# Claude
+# Claude / Codex
 **/.claude/
 **/CLAUDE.md
+**/AGENTS.md
+
+# Random
+res/

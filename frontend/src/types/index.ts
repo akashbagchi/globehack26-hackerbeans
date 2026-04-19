@@ -22,6 +22,13 @@ export interface VehicleData {
   fuel_level_pct: number
   odometer_miles: number
   mpg_avg: number
+  capacity_lbs: number
+  cab_type: string
+  trailer_type: string
+  trailer_length_ft: number
+  refrigerated: boolean
+  maintenance_ready: boolean
+  hazmat_permitted: boolean
 }
 
 export interface EconomicsData {
@@ -40,15 +47,38 @@ export interface LoadData {
   eta: string
 }
 
+export interface ContractConstraintsData {
+  max_deadhead_miles: number
+  preferred_regions: string[]
+  excluded_cargo_types: string[]
+}
+
+export interface AvailabilityWindowData {
+  available_from: string
+  available_until: string
+}
+
+export interface ReadinessData {
+  state: string
+  score: number
+  blocker_reasons: string[]
+  available_at?: string | null
+}
+
 export interface Driver {
   driver_id: string
   name: string
   truck_number: string
-  status: 'driving' | 'idle' | 'off_duty'
+  status: 'driving' | 'idle' | 'off_duty' | 'unavailable' | 'breakdown'
   location: LocationData
   hos: HOSData
   vehicle: VehicleData
   economics: EconomicsData
+  certifications: string[]
+  endorsements: string[]
+  contract_constraints: ContractConstraintsData
+  availability_window: AvailabilityWindowData
+  readiness: ReadinessData
   current_load: LoadData | null
 }
 

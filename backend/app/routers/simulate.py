@@ -1,9 +1,10 @@
 import math
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from datetime import datetime, timezone
 from app.models.load import SimulationRequest
 from app.services.navpro import get_driver, resolve_coords, build_route_geojson, haversine_miles
 from app.services.claude import get_simulation_narrator
+from app.limiter import limiter
 
 router = APIRouter(prefix="/simulate", tags=["simulate"])
 
@@ -12,7 +13,8 @@ COST_PER_MILE_OVERHEAD = 0.15
 
 
 @router.post("/assignment")
-async def simulate_assignment(req: SimulationRequest):
+@limiter.limit("10/minute")
+async def simulate_assignment(request: Request, req: SimulationRequest):
     driver = await get_driver(req.driver_id)
     if not driver:
         raise HTTPException(status_code=404, detail="Driver not found")
