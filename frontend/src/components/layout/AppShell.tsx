@@ -1,4 +1,4 @@
-import { Map, BarChart2, Users, MessageSquare, Layers } from 'lucide-react'
+import { Map, BarChart2, MessageSquare } from 'lucide-react'
 import { useUIStore } from '../../store/uiStore'
 import { TopBar } from './TopBar'
 import { FleetMap } from '../map/FleetMap'

@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
-import mapboxgl from 'mapbox-gl'
+import type { Map as MapboxMap, GeoJSONSource } from 'mapbox-gl'
 import { useFleetStore } from '../../store/fleetStore'
 
 interface GhostRouteLayerProps {
-  map: mapboxgl.Map
+  map: MapboxMap
 }
 
 const GHOST_SOURCE = 'ghost-route'
@@ -22,7 +22,7 @@ export function GhostRouteLayer({ map }: GhostRouteLayerProps) {
     if (!map.getSource(GHOST_SOURCE)) {
       map.addSource(GHOST_SOURCE, { type: 'geojson', data: simulatedRoute as GeoJSON.Feature })
     } else {
-      ;(map.getSource(GHOST_SOURCE) as mapboxgl.GeoJSONSource).setData(simulatedRoute as GeoJSON.Feature)
+      ;(map.getSource(GHOST_SOURCE) as GeoJSONSource).setData(simulatedRoute as GeoJSON.Feature)
     }
 
     if (!map.getLayer(GHOST_GLOW)) {
@@ -53,7 +53,7 @@ export function GhostRouteLayer({ map }: GhostRouteLayerProps) {
   return null
 }
 
-function removeGhostLayers(map: mapboxgl.Map) {
+function removeGhostLayers(map: MapboxMap) {
   for (const id of [GHOST_GLOW, GHOST_CORE]) {
     if (map.getLayer(id)) map.removeLayer(id)
   }
