@@ -1,11 +1,20 @@
 import { useState } from 'react'
-import { ArrowLeft, MapPin, Truck, Zap, Camera, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Camera, MapPin, Truck, Zap, AlertTriangle } from 'lucide-react'
 import { useFleetStore } from '../../store/fleetStore'
 import { fetchDispatchRecommendations } from '../../api/client'
 import { DriverMatch } from '../dispatch/DriverMatch'
 import { SimulateButton } from '../dispatch/SimulateButton'
+import { DisclosureSection } from '../shared/DisclosureSection'
 import { getVisionFeedAssignments } from '../../lib/visionFeeds'
 import { VisionVideoPlayer } from '../vision/VisionVideoPlayer'
+import {
+  formatAvailabilityWindow,
+  formatShortDateTime,
+  getAvailabilitySummary,
+  getHosSummary,
+  humanizeLabel,
+  SUMMARY_TONE_STYLES,
+} from '../../lib/driverPresentation'
 
 const STATUS_CONFIG = {
   driving: { label: 'Driving', color: 'text-green-700 bg-green-50 border border-green-200' },
@@ -76,6 +85,39 @@ export function DriverDetail() {
   }
   const readinessStyle = READINESS_CONFIG[readiness.state] ?? 'text-gray-700 bg-gray-50 border border-gray-200'
   const certifications = [...new Set([...(driver.certifications ?? []), ...(driver.endorsements ?? [])])]
+  const availability = getAvailabilitySummary(readiness, driver.current_load)
+  const hosSummary = getHosSummary(driver.hos)
+  const assignmentSummary = driver.current_load ? 'Active load in progress' : 'Unassigned'
+  const visionStatus = visionAlert?.status ?? (visionFeedUrl ? 'clear' : null)
+  const visionBadgeClass = visionStatus === 'critical'
+    ? 'bg-red-100 text-red-700'
+    : visionStatus === 'watch'
+      ? 'bg-orange-100 text-orange-700'
+      : 'bg-emerald-100 text-emerald-700'
+  const sectionKey = `${driver.driver_id}-${tab}`
+
+  const operationalAlerts = [
+    ...(visionAlert && visionAlert.status !== 'clear'
+      ? [{
+          tone: visionAlert.status === 'critical'
+            ? 'border-red-200 bg-red-50 text-red-700'
+            : 'border-orange-200 bg-orange-50 text-orange-700',
+          text: visionAlert.summary,
+        }]
+      : []),
+    ...(readiness.blocker_reasons.length > 0
+      ? [{
+          tone: 'border-red-200 bg-red-50 text-red-700',
+          text: `${readiness.blocker_reasons.length} blocker${readiness.blocker_reasons.length > 1 ? 's' : ''} affecting availability`,
+        }]
+      : []),
+    ...(driver.status === 'breakdown'
+      ? [{
+          tone: 'border-red-200 bg-red-50 text-red-700',
+          text: 'Driver needs immediate operational attention before assignment.',
+        }]
+      : []),
+  ]
 
   async function handleDispatch(e: React.FormEvent) {
     e.preventDefault()
@@ -88,10 +130,10 @@ export function DriverDetail() {
   }
 
   const inputClass = 'w-full border border-[#dadce0] rounded px-3 py-2 text-sm text-[#202124] placeholder-[#5f6368] focus:outline-none focus:border-[#1a73e8] bg-white'
+  const summaryCardClass = 'rounded-2xl border border-[#dadce0] bg-white px-3 py-3'
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
       <div className="px-4 py-3 border-b border-[#dadce0] shrink-0">
         <div className="flex items-center gap-2 mb-3">
           <button onClick={() => setSelectedDriver(null)} className="text-[#5f6368] hover:text-[#202124] transition-colors">
@@ -105,17 +147,21 @@ export function DriverDetail() {
           <div className={`w-10 h-10 rounded-full ${avatarBg} flex items-center justify-center text-white text-sm font-semibold shrink-0`}>
             {initials}
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="text-sm font-semibold text-[#202124]">{driver.name}</div>
-            <div className="text-xs text-[#5f6368] flex items-center gap-1">
-              <Truck size={10} />
-              {driver.vehicle.year} {driver.vehicle.make} {driver.vehicle.model} · {driver.truck_number}
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[#5f6368]">
+              <span className="inline-flex items-center gap-1">
+                <MapPin size={11} />
+                {driver.location.city}, {driver.location.state}
+              </span>
+              <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${SUMMARY_TONE_STYLES[availability.tone]}`}>
+                {availability.label}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-[#dadce0] shrink-0">
         {(['details', 'dispatch'] as const).map((t) => (
           <button
@@ -132,194 +178,250 @@ export function DriverDetail() {
 
       <div className="flex-1 overflow-y-auto">
         {tab === 'details' && (
-          <div className="p-4 space-y-4">
-            {visionFeedUrl && (
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <div className="text-xs font-medium uppercase tracking-wide text-[#5f6368]">SAURON Vision</div>
-                  {visionAlert && (
-                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${
-                      visionAlert.status === 'critical'
-                        ? 'bg-red-100 text-red-700'
-                        : visionAlert.status === 'watch'
-                          ? 'bg-orange-100 text-orange-700'
-                          : 'bg-emerald-100 text-emerald-700'
-                    }`}>
-                      {visionAlert.status} · {visionAlert.attention_score}
-                    </span>
-                  )}
-                </div>
-                <div className="overflow-hidden rounded-2xl border border-[#dadce0] bg-[#0f172a]">
-                  <VisionVideoPlayer
-                    src={visionFeedUrl}
-                    className="aspect-video w-full"
-                    controls
-                  />
-                  <div className="flex items-start justify-between gap-3 border-t border-white/10 bg-[#111827] px-4 py-3 text-white">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-slate-300">
-                        <Camera size={12} />
-                        Active feed
-                      </div>
-                      <p className="mt-1 text-sm text-slate-100">
-                        {visionAlert?.summary ?? 'SAURON is monitoring this truck in the background.'}
-                      </p>
-                    </div>
-                    {visionAlert?.primary_issue && (
-                      <div className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase text-white">
-                        <AlertTriangle size={10} />
-                        {visionAlert.primary_issue.replace(/_/g, ' ')}
-                      </div>
-                    )}
+          <div className="p-4 space-y-4 bg-[#f8f9fa]">
+            {operationalAlerts.length > 0 && (
+              <div className="space-y-2">
+                {operationalAlerts.map((alert) => (
+                  <div key={alert.text} className={`flex items-start gap-2 rounded-2xl border px-3 py-2 text-xs ${alert.tone}`}>
+                    <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                    <span>{alert.text}</span>
                   </div>
-                </div>
+                ))}
               </div>
             )}
 
-            <div>
-              <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Location</div>
-              <div className="flex items-center gap-2 text-sm text-[#202124]">
-                <MapPin size={13} className="text-[#5f6368] shrink-0" />
-                {driver.location.city}, {driver.location.state}
-                {driver.status === 'driving' && (
-                  <span className="text-xs text-[#5f6368]">· {driver.location.speed_mph} mph</span>
-                )}
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className={summaryCardClass}>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-[#5f6368]">Location</div>
+                <div className="mt-1 text-sm font-semibold text-[#202124]">{driver.location.city}, {driver.location.state}</div>
+                <div className="mt-1 text-xs text-[#5f6368]">
+                  {driver.status === 'driving' ? `${driver.location.speed_mph} mph in motion` : 'Stationary'}
+                </div>
+              </div>
+
+              <div className={summaryCardClass}>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-[#5f6368]">Availability</div>
+                <div className="mt-1 text-sm font-semibold text-[#202124]">{availability.label}</div>
+                <div className="mt-1 text-xs text-[#5f6368]">Window {formatAvailabilityWindow(availabilityWindow)}</div>
+              </div>
+
+              <div className={summaryCardClass}>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-[#5f6368]">HOS</div>
+                <div className="mt-1 text-sm font-semibold text-[#202124]">{hosSummary.label}</div>
+                <div className="mt-1 text-xs text-[#5f6368]">Shift {driver.hos.shift_remaining_hrs.toFixed(1)}h · Cycle {driver.hos.cycle_remaining_hrs.toFixed(1)}h</div>
+              </div>
+
+              <div className={summaryCardClass}>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-[#5f6368]">Assignment</div>
+                <div className="mt-1 text-sm font-semibold text-[#202124]">{assignmentSummary}</div>
+                <div className="mt-1 text-xs text-[#5f6368]">
+                  {driver.current_load ? `${driver.current_load.load_id} · ${driver.current_load.origin} to ${driver.current_load.destination}` : 'Ready for manual review or auto-assignment'}
+                </div>
               </div>
             </div>
 
-            <div>
-              <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Readiness</div>
-              <div className="space-y-2">
-                <div className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${readinessStyle}`}>
-                  {readiness.state.replace('_', ' ')} · score {readiness.score}
+            <DisclosureSection
+              key={`${sectionKey}-readiness`}
+              title="Operational readiness"
+              summary={`${humanizeLabel(readiness.state)} · ${availability.label}`}
+              badge={<span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${readinessStyle}`}>{humanizeLabel(readiness.state)}</span>}
+              resetKey={`${sectionKey}-readiness`}
+            >
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${SUMMARY_TONE_STYLES[availability.tone]}`}>
+                    {availability.label}
+                  </span>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${readinessStyle}`}>
+                    Score {readiness.score}
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
-                    <div className="text-[#5f6368]">Available Window</div>
-                    <div className="font-medium text-[#202124]">
-                      {new Date(availabilityWindow.available_from).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                      {' - '}
-                      {new Date(availabilityWindow.available_until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                    </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
+                  <div className="rounded-xl border border-[#dadce0] bg-[#f8f9fa] p-3">
+                    <div className="text-[#5f6368]">Available window</div>
+                    <div className="mt-1 font-medium text-[#202124]">{formatAvailabilityWindow(availabilityWindow)}</div>
                   </div>
-                  <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
-                    <div className="text-[#5f6368]">Next Available</div>
-                    <div className="font-medium text-[#202124]">
-                      {readiness.available_at ? new Date(readiness.available_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Now'}
-                    </div>
+                  <div className="rounded-xl border border-[#dadce0] bg-[#f8f9fa] p-3">
+                    <div className="text-[#5f6368]">Next available</div>
+                    <div className="mt-1 font-medium text-[#202124]">{formatShortDateTime(readiness.available_at) ?? 'Now'}</div>
                   </div>
                 </div>
-                {readiness.blocker_reasons.length > 0 && (
-                  <div className="space-y-1">
-                    {readiness.blocker_reasons.map((reason) => (
-                      <div key={reason} className="text-[11px] text-[#5f6368] bg-[#f8f9fa] border border-[#dadce0] rounded px-2 py-1">
-                        {reason}
+
+                <div>
+                  <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[#5f6368]">HOS detail</div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: 'Drive', value: driver.hos.drive_remaining_hrs },
+                      { label: 'Shift', value: driver.hos.shift_remaining_hrs },
+                      { label: 'Cycle', value: driver.hos.cycle_remaining_hrs },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="rounded-xl border border-[#dadce0] bg-[#f8f9fa] p-2 text-center">
+                        <div className="text-[10px] text-[#5f6368]">{label}</div>
+                        <div className={`text-sm font-semibold ${value < 2 ? 'text-red-500' : value < 4 ? 'text-yellow-600' : 'text-[#202124]'}`}>
+                          {value.toFixed(1)}h
+                        </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
 
-            <div>
-              <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Hours of Service</div>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: 'Drive', value: driver.hos.drive_remaining_hrs },
-                  { label: 'Shift', value: driver.hos.shift_remaining_hrs },
-                  { label: 'Cycle', value: driver.hos.cycle_remaining_hrs },
-                ].map(({ label, value }) => (
-                  <div key={label} className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2 text-center">
-                    <div className="text-[10px] text-[#5f6368]">{label}</div>
-                    <div className={`text-sm font-semibold ${value < 2 ? 'text-red-500' : value < 4 ? 'text-yellow-600' : 'text-[#202124]'}`}>
-                      {value.toFixed(1)}h
+                {readiness.blocker_reasons.length > 0 && (
+                  <div>
+                    <div className="mb-2 text-xs font-medium uppercase tracking-wide text-[#5f6368]">Blockers</div>
+                    <div className="space-y-2">
+                      {readiness.blocker_reasons.map((reason) => (
+                        <div key={reason} className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                          {reason}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                )}
               </div>
-            </div>
+            </DisclosureSection>
 
-            <div>
-              <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Truck</div>
-              <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-xs">
-                <div><span className="text-[#5f6368]">Fuel</span><div className="font-medium text-[#202124]">{vehicle.fuel_level_pct}%</div></div>
-                <div><span className="text-[#5f6368]">MPG</span><div className="font-medium text-[#202124]">{vehicle.mpg_avg}</div></div>
-                <div><span className="text-[#5f6368]">$/mi</span><div className="font-medium text-[#202124]">${driver.economics.cost_per_mile}</div></div>
-                <div><span className="text-[#5f6368]">Capacity</span><div className="font-medium text-[#202124]">{vehicle.capacity_lbs.toLocaleString()} lbs</div></div>
-                <div><span className="text-[#5f6368]">Trailer</span><div className="font-medium text-[#202124]">{vehicle.trailer_type.replace('_', ' ')}</div></div>
-                <div><span className="text-[#5f6368]">Cab</span><div className="font-medium text-[#202124]">{vehicle.cab_type.replace('_', ' ')}</div></div>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <span className={`text-[10px] px-2 py-1 rounded-full ${vehicle.refrigerated ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
-                  {vehicle.refrigerated ? 'Reefer Ready' : 'Dry Equipment'}
-                </span>
-                <span className={`text-[10px] px-2 py-1 rounded-full ${vehicle.hazmat_permitted ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                  {vehicle.hazmat_permitted ? 'Hazmat Permitted' : 'No Hazmat'}
-                </span>
-                <span className={`text-[10px] px-2 py-1 rounded-full ${vehicle.maintenance_ready ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                  {vehicle.maintenance_ready ? 'Maintenance Ready' : 'Maintenance Hold'}
-                </span>
-              </div>
-            </div>
+            <DisclosureSection
+              key={`${sectionKey}-equipment`}
+              title="Equipment"
+              summary="Truck, trailer, capacity, fuel, and maintenance"
+              badge={<Truck size={14} className="text-[#5f6368]" />}
+              resetKey={`${sectionKey}-equipment`}
+            >
+              <div className="space-y-3 text-xs">
+                <div className="rounded-xl border border-[#dadce0] bg-[#f8f9fa] p-3">
+                  <div className="text-[#5f6368]">Assigned truck</div>
+                  <div className="mt-1 font-medium text-[#202124]">
+                    {driver.truck_number} · {driver.vehicle.year} {driver.vehicle.make} {driver.vehicle.model}
+                  </div>
+                </div>
 
-            <div>
-              <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Qualifications</div>
-              <div className="flex flex-wrap gap-2">
-                {certifications.map((cert) => (
-                  <span key={cert} className="text-[10px] px-2 py-1 rounded-full bg-[#e8f0fe] text-[#1a73e8]">
-                    {cert.replace(/_/g, ' ')}
-                  </span>
-                ))}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
-                  <div className="text-[#5f6368]">Max Deadhead</div>
-                  <div className="font-medium text-[#202124]">{contractConstraints.max_deadhead_miles} mi</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <InfoCell label="Fuel" value={`${vehicle.fuel_level_pct}%`} />
+                  <InfoCell label="MPG" value={String(vehicle.mpg_avg)} />
+                  <InfoCell label="Capacity" value={`${vehicle.capacity_lbs.toLocaleString()} lbs`} />
+                  <InfoCell label="Cost / mi" value={`$${driver.economics.cost_per_mile}`} />
+                  <InfoCell label="Trailer" value={humanizeLabel(vehicle.trailer_type)} />
+                  <InfoCell label="Cab" value={humanizeLabel(vehicle.cab_type)} />
                 </div>
-                <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
-                  <div className="text-[#5f6368]">Preferred Regions</div>
-                  <div className="font-medium text-[#202124]">{contractConstraints.preferred_regions.join(', ') || 'Not set'}</div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Pill tone={vehicle.refrigerated ? 'info' : 'neutral'} label={vehicle.refrigerated ? 'Reefer ready' : 'Dry equipment'} />
+                  <Pill tone={vehicle.hazmat_permitted ? 'info' : 'neutral'} label={vehicle.hazmat_permitted ? 'Hazmat permitted' : 'No hazmat'} />
+                  <Pill tone={vehicle.maintenance_ready ? 'positive' : 'critical'} label={vehicle.maintenance_ready ? 'Maintenance ready' : 'Maintenance hold'} />
                 </div>
               </div>
-              {contractConstraints.excluded_cargo_types.length > 0 && (
-                <div className="mt-2 text-[11px] text-[#5f6368]">
-                  Excludes: {contractConstraints.excluded_cargo_types.join(', ')}
+            </DisclosureSection>
+
+            <DisclosureSection
+              key={`${sectionKey}-constraints`}
+              title="Constraints"
+              summary="Qualifications, deadhead limits, and lane preferences"
+              resetKey={`${sectionKey}-constraints`}
+            >
+              <div className="space-y-3 text-xs">
+                <div className="flex flex-wrap gap-2">
+                  {certifications.length > 0 ? certifications.map((cert) => (
+                    <span key={cert} className="rounded-full bg-[#e8f0fe] px-2 py-1 text-[#1a73e8]">
+                      {humanizeLabel(cert)}
+                    </span>
+                  )) : (
+                    <span className="text-[#5f6368]">No certifications or endorsements listed</span>
+                  )}
                 </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <InfoCell label="Max deadhead" value={`${contractConstraints.max_deadhead_miles} mi`} />
+                  <InfoCell label="Preferred regions" value={contractConstraints.preferred_regions.join(', ') || 'Not set'} />
+                </div>
+
+                {contractConstraints.excluded_cargo_types.length > 0 && (
+                  <div className="rounded-xl border border-[#dadce0] bg-[#f8f9fa] p-3">
+                    <div className="text-[#5f6368]">Excluded cargo</div>
+                    <div className="mt-1 font-medium text-[#202124]">
+                      {contractConstraints.excluded_cargo_types.map(humanizeLabel).join(', ')}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </DisclosureSection>
+
+            <DisclosureSection
+              key={`${sectionKey}-load`}
+              title="Current load"
+              summary={driver.current_load ? 'Open route, cargo, and ETA' : 'No active load assigned'}
+              resetKey={`${sectionKey}-load`}
+            >
+              {driver.current_load ? (
+                <div className="space-y-3 text-xs">
+                  <div className="rounded-xl border border-[#c5d8fb] bg-[#e8f0fe] p-3">
+                    <div className="font-medium text-[#202124]">{driver.current_load.load_id}</div>
+                    <div className="mt-1 text-[#5f6368]">{driver.current_load.origin} to {driver.current_load.destination}</div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <InfoCell label="Cargo" value={driver.current_load.cargo} />
+                    <InfoCell label="Weight" value={`${driver.current_load.weight_lbs.toLocaleString()} lbs`} />
+                    <InfoCell label="ETA" value={formatShortDateTime(driver.current_load.eta) ?? 'Unknown'} />
+                    <InfoCell label="Assignment" value="In progress" />
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-[#5f6368]">No active load assigned right now.</div>
               )}
-            </div>
+            </DisclosureSection>
 
-            {driver.current_load && (
-              <div>
-                <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Active Load</div>
-                <div className="bg-[#e8f0fe] border border-[#c5d8fb] rounded p-3 space-y-1.5">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-4 h-4 rounded-full bg-[#1a73e8] text-white flex items-center justify-center text-[9px] font-bold shrink-0">P</span>
-                    <span className="text-[#202124]">{driver.current_load.origin}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-4 h-4 rounded-full bg-red-100 text-red-500 flex items-center justify-center text-[9px] font-bold shrink-0">D</span>
-                    <span className="text-[#202124]">{driver.current_load.destination}</span>
-                  </div>
-                  <div className="text-[10px] text-[#5f6368] pl-6">
-                    {driver.current_load.cargo} · {driver.current_load.weight_lbs.toLocaleString()} lbs
-                  </div>
-                </div>
+            <DisclosureSection
+              key={`${sectionKey}-performance`}
+              title="Performance"
+              summary="Daily miles, revenue, and fleet economics"
+              resetKey={`${sectionKey}-performance`}
+            >
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 text-xs">
+                <InfoCell label="Miles today" value={String(driver.economics.miles_today)} />
+                <InfoCell label="Revenue today" value={`$${driver.economics.revenue_today.toFixed(0)}`} />
+                <InfoCell label="Cost per mile" value={`$${driver.economics.cost_per_mile}`} />
               </div>
+            </DisclosureSection>
+
+            {(visionFeedUrl || visionAlert) && (
+              <DisclosureSection
+                key={`${sectionKey}-vision`}
+                title="AI / monitoring"
+                summary={visionAlert?.summary ?? 'SAURON is monitoring this truck in the background.'}
+                badge={visionStatus ? <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${visionBadgeClass}`}>{visionStatus}</span> : undefined}
+                defaultOpen={visionAlert?.status === 'watch' || visionAlert?.status === 'critical'}
+                resetKey={`${sectionKey}-vision`}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-3 rounded-xl border border-[#dadce0] bg-[#f8f9fa] px-3 py-3 text-sm">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-[#5f6368]">
+                        <Camera size={12} />
+                        SAURON vision
+                      </div>
+                      <p className="mt-1 text-[#202124]">
+                        {visionAlert?.summary ?? 'Monitoring active with no current issues flagged.'}
+                      </p>
+                      {visionAlert?.recommended_action && (
+                        <p className="mt-2 text-xs text-[#5f6368]">Recommended action: {visionAlert.recommended_action}</p>
+                      )}
+                    </div>
+                    {visionAlert?.primary_issue && (
+                      <div className="shrink-0 rounded-full bg-white px-2 py-1 text-[10px] font-semibold uppercase text-[#202124] border border-[#dadce0]">
+                        {humanizeLabel(visionAlert.primary_issue)}
+                      </div>
+                    )}
+                  </div>
+
+                  {visionFeedUrl && (
+                    <div className="overflow-hidden rounded-2xl border border-[#dadce0] bg-[#0f172a]">
+                      <VisionVideoPlayer src={visionFeedUrl} className="aspect-video w-full" controls />
+                    </div>
+                  )}
+                </div>
+              </DisclosureSection>
             )}
-
-            <div>
-              <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Today's Performance</div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
-                  <div className="text-[10px] text-[#5f6368]">Miles</div>
-                  <div className="text-sm font-semibold text-[#202124]">{driver.economics.miles_today}</div>
-                </div>
-                <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
-                  <div className="text-[10px] text-[#5f6368]">Revenue</div>
-                  <div className="text-sm font-semibold text-[#202124]">${driver.economics.revenue_today.toFixed(0)}</div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
 
@@ -375,5 +477,22 @@ export function DriverDetail() {
         )}
       </div>
     </div>
+  )
+}
+
+function InfoCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#dadce0] bg-[#f8f9fa] p-3">
+      <div className="text-[#5f6368]">{label}</div>
+      <div className="mt-1 font-medium text-[#202124]">{value}</div>
+    </div>
+  )
+}
+
+function Pill({ label, tone }: { label: string; tone: keyof typeof SUMMARY_TONE_STYLES }) {
+  return (
+    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${SUMMARY_TONE_STYLES[tone]}`}>
+      {label}
+    </span>
   )
 }

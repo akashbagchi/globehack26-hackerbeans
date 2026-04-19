@@ -8,6 +8,7 @@ from app.models.domain import (
     ShipmentInterventionOutreachUpdate,
     ShipmentInterventionRoadsideUpdate,
     ShipmentInterventionRerouteUpdate,
+    TestNotifyPayload,
 )
 from app.services.dispatch_scoring import build_dispatch_scoring_signals
 from app.services.interventions import (
@@ -24,6 +25,7 @@ from app.services.operational_analytics import (
     get_next_day_planning_report,
 )
 from app.services.operations import (
+    call_proactive_notify,
     OperationsServiceConflict,
     OperationsServiceError,
     OperationsServiceNotConfigured,
@@ -503,6 +505,25 @@ async def get_consignment_notifications(
         "data": notifications,
         "count": len(notifications),
         "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/notify/test")
+async def trigger_test_notification(payload: TestNotifyPayload):
+    await call_proactive_notify(
+        driver_id=payload.driver_id,
+        driver_name=payload.driver_name,
+        reason=payload.reason,
+        eta_delta=payload.eta_delta,
+        load_id=payload.load_id,
+        consignment_id=payload.consignment_id,
+        receiver_phone=payload.receiver_phone,
+        receiver_name=payload.receiver_name,
+    )
+    return {
+        "data": {"queued": True},
         "source": "insforge",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }

@@ -19,9 +19,16 @@ from app.services.interventions import (
     create_operational_exception_intervention,
     create_route_deviation_intervention,
 )
-from app.services.operations import create_route_event_notification
+from app.services.operations import (
+    call_proactive_notify,
+    create_route_event_notification,
+    _resolve_consignment_for_driver,
+)
 
 logger = logging.getLogger(__name__)
+
+# Dedup guard: fire proactive SMS only once per driver per server run
+_proactive_notified_drivers: set[str] = set()
 
 
 async def _log_event(event: FleetEvent) -> None:
@@ -92,6 +99,38 @@ async def _watch_route_deviations(event: FleetEvent) -> None:
             "lng": event.payload.lng,
         },
     )
+
+    if event.payload.severity == "major" and event.payload.driver_id not in _proactive_notified_drivers:
+        _proactive_notified_drivers.add(event.payload.driver_id)
+        try:
+            consignment = await _resolve_consignment_for_driver(
+                fleet_id=event.fleet_id,
+                assignment_id=event.payload.assignment_id,
+                driver_id=event.payload.driver_id,
+            )
+            if consignment:
+                sms_prefs = [
+                    p for p in (consignment.get("receiver_contact_preferences") or [])
+                    if p.get("channel") == "sms" and p.get("recipient")
+                ]
+                if sms_prefs:
+                    await call_proactive_notify(
+                        driver_id=event.payload.driver_id,
+                        driver_name=None,
+                        reason=f"Major route deviation detected — {event.payload.deviation_miles:.1f} mi off planned corridor in {event.payload.corridor}",
+                        eta_delta=45,
+                        load_id=event.payload.assignment_id or consignment.get("consignment_id", "unknown"),
+                        consignment_id=consignment.get("consignment_id"),
+                        receiver_phone=sms_prefs[0]["recipient"],
+                        receiver_name=consignment.get("receiver_name"),
+                    )
+                else:
+                    logger.info(
+                        "proactive-notify skipped for %s: no SMS contact preference on consignment",
+                        event.payload.driver_id,
+                    )
+        except Exception as exc:
+            logger.warning("proactive-notify trigger failed for %s: %s", event.payload.driver_id, exc)
 
 
 async def _watch_breakdown_notifications(event: FleetEvent) -> None:

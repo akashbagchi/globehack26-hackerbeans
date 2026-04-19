@@ -383,6 +383,39 @@ export async function updateRoadsideAssistance(params: {
   )
 }
 
+export async function fetchRecentNotifications(fleetId: string): Promise<ReceiverNotification[]> {
+  const rows = await requestInsforge<ReceiverNotification[]>(
+    `/api/database/records/receiver_notifications?fleet_id=eq.${fleetId}&order=sent_at.desc&limit=10`,
+    { method: 'GET', headers: { Accept: 'application/json' } },
+  )
+  return Array.isArray(rows) ? rows : []
+}
+
+export async function triggerTestNotification(params: {
+  driverId: string
+  driverName?: string
+  reason: string
+  etaDelta: number
+  loadId: string
+  consignmentId?: string
+  receiverPhone: string
+  receiverName?: string
+}): Promise<void> {
+  await requestOperations(`${operationsBaseUrl}/operations/notify/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      driver_id: params.driverId,
+      driver_name: params.driverName,
+      reason: params.reason,
+      eta_delta: params.etaDelta,
+      load_id: params.loadId,
+      consignment_id: params.consignmentId,
+      receiver_phone: params.receiverPhone,
+      receiver_name: params.receiverName,
+    }),
+  })
+}
 export async function createConsignment(payload: ConsignmentPayload): Promise<{ data: Consignment }> {
   return requestOperations(`${operationsBaseUrl}/operations/consignments`, {
     method: 'POST',

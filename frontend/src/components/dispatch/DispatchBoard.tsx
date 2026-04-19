@@ -1,5 +1,6 @@
 import { AlertTriangle, CalendarDays, Clock3, Loader2, PackagePlus, RefreshCcw, Truck, Zap } from 'lucide-react'
 import type { Consignment, ConsignmentStatus, OrchestrationResult } from '../../types'
+import { DisclosureSection } from '../shared/DisclosureSection'
 
 type BoardColumn = {
   id: string
@@ -80,6 +81,7 @@ export function DispatchBoard({
   onDismissOrchestration,
 }: DispatchBoardProps) {
   const hasAnyConsignments = consignments.length > 0
+  const needsReviewPlans = orchestrationResult?.plans.filter((p) => p.decision === 'needs_review') ?? []
 
   return (
     <div className="flex flex-col h-full bg-[#f8f9fa]">
@@ -149,7 +151,7 @@ export function DispatchBoard({
               Dismiss
             </button>
           </div>
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-3 text-xs">
             <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 font-medium text-green-700">
               {orchestrationResult.auto_assigned} assigned
             </span>
@@ -167,29 +169,60 @@ export function DispatchBoard({
               {orchestrationResult.total_consignments} consignments processed
             </span>
           </div>
-          {orchestrationResult.plans.filter((p) => p.decision === 'needs_review').length > 0 && (
-            <div className="space-y-1 pt-1">
+
+          {needsReviewPlans.length > 0 && (
+            <div className="space-y-2 pt-1">
               <p className="text-[11px] font-medium uppercase tracking-wide text-[#5f6368]">Pending Review</p>
-              {orchestrationResult.plans
-                .filter((p) => p.decision === 'needs_review')
-                .map((plan) => (
+              {needsReviewPlans.map((plan) => (
+                <div key={plan.consignment_id} className="rounded-xl border border-amber-200 bg-white px-3 py-3">
                   <button
-                    key={plan.consignment_id}
                     onClick={() => onSelect(plan.consignment_id)}
-                    className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-left text-xs hover:border-amber-400 transition-colors"
+                    className="w-full text-left"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <span className="font-medium text-[#202124]">{plan.consignment_id}</span>
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 font-medium">
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 text-[11px] font-medium">
                         Score {plan.score}
                       </span>
                     </div>
-                    <p className="mt-1 text-[#5f6368]">
-                      {plan.consignment_summary} — Proposed: {plan.assigned_driver_id ?? 'none'}
-                    </p>
-                    <p className="mt-0.5 text-[#80868b]">{plan.reasoning}</p>
+                    <p className="mt-1 text-xs text-[#5f6368]">{plan.consignment_summary}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[#5f6368]">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#f8f9fa] px-2 py-1">
+                        Proposed: {plan.assigned_driver_id ?? 'No driver'}
+                      </span>
+                      {plan.skip_reasons.length > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-red-700">
+                          {plan.skip_reasons.length} risk factor{plan.skip_reasons.length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
                   </button>
-                ))}
+
+                  <div className="mt-3">
+                    <DisclosureSection
+                      title="AI reasoning"
+                      summary="Review why this assignment was held for dispatcher approval"
+                      resetKey={`plan-${plan.consignment_id}`}
+                    >
+                      <div className="space-y-3 text-xs text-[#5f6368]">
+                        <p>{plan.reasoning}</p>
+                        {plan.skip_reasons.length > 0 && (
+                          <div>
+                            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[#5f6368]">Captured risks</div>
+                            <div className="flex flex-wrap gap-2">
+                              {plan.skip_reasons.map((reason) => (
+                                <span key={reason} className="rounded-full border border-red-200 bg-red-50 px-2 py-1 text-red-700">
+                                  {reason}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </DisclosureSection>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -247,55 +280,68 @@ export function DispatchBoard({
               ) : (
                 <div className="space-y-2">
                   {items.map((consignment) => (
-                    <button
+                    <div
                       key={consignment.consignment_id}
-                      onClick={() => onSelect(consignment.consignment_id)}
-                      className={`w-full rounded-2xl border border-[#dadce0] bg-white p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-[#b6c7e6] ${column.accent} border-l-4`}
+                      className={`rounded-2xl border border-[#dadce0] bg-white shadow-sm ${column.accent} border-l-4`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-[#202124]">{consignment.consignment_id}</div>
-                          <div className="text-xs text-[#5f6368]">
-                            {consignment.shipper_name} to {consignment.receiver_name}
+                      <button
+                        onClick={() => onSelect(consignment.consignment_id)}
+                        className="w-full p-4 text-left transition-colors hover:bg-[#fafcff]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-[#202124]">{consignment.consignment_id}</div>
+                            <div className="text-xs text-[#5f6368]">
+                              {consignment.shipper_name} to {consignment.receiver_name}
+                            </div>
                           </div>
+                          {column.id === 'exception' && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-[10px] font-semibold text-red-700">
+                              <AlertTriangle size={11} />
+                              Needs review
+                            </span>
+                          )}
                         </div>
-                        <span className="rounded-full bg-[#f1f3f4] px-2 py-1 text-[11px] font-medium text-[#5f6368]">
-                          {consignment.cargo_class.replace('_', ' ')}
-                        </span>
-                      </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[#5f6368]">
-                        <div className="rounded-xl bg-[#f8f9fa] px-3 py-2">
+                        <div className="mt-3 rounded-xl bg-[#f8f9fa] px-3 py-3">
                           <div className="font-medium text-[#202124]">{consignment.origin}</div>
-                          <div>{consignment.destination}</div>
+                          <div className="text-xs text-[#5f6368]">{consignment.destination}</div>
                         </div>
-                        <div className="rounded-xl bg-[#f8f9fa] px-3 py-2">
-                          <div className="font-medium text-[#202124]">{consignment.weight_lbs.toLocaleString()} lbs</div>
-                          <div>{consignment.cargo_description}</div>
-                        </div>
-                      </div>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-[#5f6368]">
-                        <span className="inline-flex items-center gap-1">
-                          <Clock3 size={12} />
-                          Pickup {formatWindow(consignment.pickup_window_start_at, consignment.pickup_window_end_at)}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Truck size={12} />
-                          {consignment.assigned_driver_id ? `Driver ${consignment.assigned_driver_id}` : 'No driver assigned'}
-                        </span>
-                        {column.id === 'exception' && (
-                          <span className="inline-flex items-center gap-1 text-red-600">
-                            <AlertTriangle size={12} />
-                            Needs dispatcher review
+                        <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-[#5f6368]">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock3 size={12} />
+                            Pickup {formatWindow(consignment.pickup_window_start_at, consignment.pickup_window_end_at)}
                           </span>
-                        )}
-                      </div>
+                          <span className="inline-flex items-center gap-1">
+                            <Truck size={12} />
+                            {consignment.assigned_driver_id ? `Driver ${consignment.assigned_driver_id}` : 'No driver assigned'}
+                          </span>
+                        </div>
+                      </button>
 
-                      <div className="mt-2 text-[11px] text-[#5f6368]">
-                        Handling: {formatSpecialHandling(consignment.special_handling)}
+                      <div className="px-4 pb-4">
+                        <DisclosureSection
+                          title="Load details"
+                          summary="Cargo, weight, handling, and delivery windows"
+                          resetKey={`load-${consignment.consignment_id}`}
+                        >
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
+                            <InfoCell label="Cargo description" value={consignment.cargo_description} />
+                            <InfoCell label="Cargo class" value={consignment.cargo_class.replace(/_/g, ' ')} />
+                            <InfoCell label="Weight" value={`${consignment.weight_lbs.toLocaleString()} lbs`} />
+                            <InfoCell
+                              label="Delivery window"
+                              value={formatWindow(consignment.delivery_window_start_at, consignment.delivery_window_end_at)}
+                            />
+                          </div>
+                          <div className="mt-3 rounded-xl border border-[#dadce0] bg-[#f8f9fa] p-3 text-xs">
+                            <div className="text-[#5f6368]">Handling</div>
+                            <div className="mt-1 font-medium text-[#202124]">{formatSpecialHandling(consignment.special_handling)}</div>
+                          </div>
+                        </DisclosureSection>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -303,6 +349,15 @@ export function DispatchBoard({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function InfoCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#dadce0] bg-[#f8f9fa] p-3">
+      <div className="text-[#5f6368]">{label}</div>
+      <div className="mt-1 font-medium text-[#202124]">{value}</div>
     </div>
   )
 }
