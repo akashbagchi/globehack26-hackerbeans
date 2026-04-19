@@ -14,8 +14,6 @@ export function useStreamingChat() {
     setMessages((prev) => [...prev, userMsg, assistantMsg])
     setIsStreaming(true)
 
-    const assistantIndex = messages.length + 1
-
     const cancel = streamChat([...messages, userMsg], (token) => {
       setMessages((prev) => {
         const updated = [...prev]

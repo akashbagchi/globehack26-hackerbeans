@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, Phone, MapPin, Truck, Zap } from 'lucide-react'
+import { ArrowLeft, MapPin, Truck, Zap } from 'lucide-react'
 import { useFleetStore } from '../../store/fleetStore'
 import { fetchDispatchRecommendations } from '../../api/client'
 import { DriverMatch } from '../dispatch/DriverMatch'

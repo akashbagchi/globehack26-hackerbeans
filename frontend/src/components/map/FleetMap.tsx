@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { useMapbox } from '../../hooks/useMapbox'
@@ -14,8 +14,14 @@ export function FleetMap() {
   const mapReady = useUIStore((s) => s.mapReady)
   const selectedDriverId = useFleetStore((s) => s.selectedDriverId)
   const drivers = useFleetStore((s) => s.drivers)
-  const simulatedRoute = useFleetStore((s) => s.simulatedRoute)
   const simulationResult = useFleetStore((s) => s.simulationResult)
+  const [map, setMap] = useState<mapboxgl.Map | null>(null)
+
+  useEffect(() => {
+    if (mapReady && mapRef.current) {
+      setMap(mapRef.current)
+    }
+  }, [mapReady, mapRef])
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !selectedDriverId) return
@@ -27,7 +33,7 @@ export function FleetMap() {
       duration: 1200,
       pitch: 45,
     })
-  }, [selectedDriverId, mapReady])
+  }, [selectedDriverId, mapReady, drivers, mapRef])
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !simulationResult) return
@@ -36,16 +42,16 @@ export function FleetMap() {
     bounds.extend([pickup_coords.lng, pickup_coords.lat])
     bounds.extend([destination_coords.lng, destination_coords.lat])
     mapRef.current.fitBounds(bounds, { padding: 80, duration: 1500, pitch: 40 })
-  }, [simulationResult, mapReady])
+  }, [simulationResult, mapReady, mapRef])
 
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
-      {mapReady && mapRef.current && (
+      {mapReady && map && (
         <>
-          <TruckMarkers map={mapRef.current} />
-          <RouteLayer map={mapRef.current} />
-          <GhostRouteLayer map={mapRef.current} />
+          <TruckMarkers map={map} />
+          <RouteLayer map={map} />
+          <GhostRouteLayer map={map} />
         </>
       )}
       <div className="absolute bottom-4 right-4 flex flex-col gap-2">

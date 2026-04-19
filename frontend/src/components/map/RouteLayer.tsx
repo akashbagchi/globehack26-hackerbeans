@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
-import mapboxgl from 'mapbox-gl'
+import type { Map as MapboxMap, GeoJSONSource } from 'mapbox-gl'
 import { useFleetStore } from '../../store/fleetStore'
 
 interface RouteLayerProps {
-  map: mapboxgl.Map
+  map: MapboxMap
 }
 
 export function RouteLayer({ map }: RouteLayerProps) {
@@ -44,7 +44,7 @@ export function RouteLayer({ map }: RouteLayerProps) {
         },
       })
     } else {
-      ;(map.getSource(sourceId) as mapboxgl.GeoJSONSource).setData({
+      ;(map.getSource(sourceId) as GeoJSONSource).setData({
         type: 'Feature',
         geometry: { type: 'LineString', coordinates: coords },
         properties: {},
@@ -74,7 +74,7 @@ export function RouteLayer({ map }: RouteLayerProps) {
   return null
 }
 
-function removeAllRouteLayers(map: mapboxgl.Map) {
+function removeAllRouteLayers(map: MapboxMap) {
   for (const id of ['active-route-glow', 'active-route-core']) {
     if (map.getLayer(id)) map.removeLayer(id)
   }

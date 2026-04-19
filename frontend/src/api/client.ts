@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { Driver, DriverRecommendation, InsightCard, CostChartEntry, SimulationResult, ChatMessage } from '../types'
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   timeout: 30000,
 })
 
@@ -40,7 +40,7 @@ export async function fetchSimulation(payload: {
 
 export function streamChat(messages: ChatMessage[], onToken: (token: string) => void): () => void {
   const controller = new AbortController()
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
   fetch(`${baseUrl}/chat/message`, {
     method: 'POST',
