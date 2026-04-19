@@ -375,11 +375,15 @@ class ReceiverNotification(AuditFields):
     receiver_notification_id: str
     consignment_id: str
     assignment_id: Optional[str] = None
+    notification_type: str = "manual"
     channel: NotificationChannel
     recipient: str
     sent_at: datetime
     delivery_status: str
+    eta_at: Optional[datetime] = None
     message_template: Optional[str] = None
+    message_text: Optional[str] = None
+    context: dict = Field(default_factory=dict)
     external_reference: Optional[str] = None
 
 
