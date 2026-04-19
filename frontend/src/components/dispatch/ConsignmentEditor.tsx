@@ -227,8 +227,6 @@ export function ConsignmentEditor({
       return
     }
     const activeConsignment = consignment
-
-    const activeConsignment = consignment
     let cancelled = false
 
     async function loadNotifications() {
