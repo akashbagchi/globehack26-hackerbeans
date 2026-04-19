@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
@@ -80,7 +80,9 @@ export function TruckModelLayer({ map }: TruckModelLayerProps) {
   const drivers = useFleetStore((s) => s.drivers)
 
   const driversRef = useRef(drivers)
-  driversRef.current = drivers
+  useLayoutEffect(() => {
+    driversRef.current = drivers
+  })
 
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.Camera | null>(null)
