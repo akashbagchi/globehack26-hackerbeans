@@ -1,4 +1,4 @@
-# Step 3: InsForge Schema And Seed Slice
+# InsForge Schema And Seed Slice
 
 This step creates the first persistent storage slice for operational dispatch data.
 

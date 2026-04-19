@@ -17,14 +17,6 @@ npx @insforge/cli login
 
 # Verify you're linked to the right project
 npx @insforge/cli current
-```
-
-For localhost read access to persistent InsForge data, add these to `backend/.env`:
-
-```env
-INSFORGE_BASE_URL=https://your-project.insforge.app
-INSFORGE_ANON_KEY=ik_...
-```
 
 ## Edge Functions
 
