@@ -23,7 +23,7 @@ export function LoadForm() {
         weight_lbs: parseInt(weight) || 20000,
       })
       setDispatchRecommendations(result.recommendations, result.dispatch_note)
-    } catch (err) {
+    } catch {
       setIsDispatching(false)
     }
   }

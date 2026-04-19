@@ -17,6 +17,8 @@ frontend/.env
 frontend/node_modules/
 frontend/dist/
 frontend/dist-ssr/
+frontend/.next/
+frontend/out/
 
 # macOS
 .DS_Store
@@ -25,3 +27,7 @@ frontend/dist-ssr/
 .vscode/
 .idea/
 *.sw?
+
+# Claude
+**/.claude/
+**/CLAUDE.md
