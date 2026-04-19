@@ -136,3 +136,25 @@ export interface GeoJSONFeature {
   }
   properties: Record<string, unknown>
 }
+
+export interface TelemetryPosition {
+  lat: number
+  lng: number
+  speed_mph: number
+  heading: number
+  route_progress_pct: number
+  timestamp: string
+}
+
+export interface RouteDeviation {
+  driver_id: string
+  driver_name: string
+  load_id: string
+  detected_at: string
+  severity: 'minor' | 'major'
+  deviation_miles: number
+  lat: number
+  lng: number
+  corridor: string
+  resolved: boolean
+}

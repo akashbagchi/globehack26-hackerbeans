@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Driver, DriverRecommendation, InsightCard, CostChartEntry, SimulationResult, GeoJSONFeature } from '../types'
+import type { Driver, DriverRecommendation, InsightCard, CostChartEntry, SimulationResult, GeoJSONFeature, RouteDeviation, TelemetryPosition } from '../types'
 
 interface FleetState {
   drivers: Driver[]
@@ -23,6 +23,9 @@ interface FleetState {
   narratorText: string | null
   isSimulating: boolean
 
+  deviations: RouteDeviation[]
+  driverRoutes: Record<string, GeoJSONFeature>
+
   setDrivers: (drivers: Driver[], source: 'navpro' | 'mock' | 'insforge') => void
   setSelectedDriver: (id: string | null) => void
   setSimulatedRoute: (route: GeoJSONFeature | null) => void
@@ -35,6 +38,9 @@ interface FleetState {
   setIsLoadingCosts: (v: boolean) => void
   setIsSimulating: (v: boolean) => void
   clearSimulation: () => void
+  setDeviations: (devs: RouteDeviation[]) => void
+  setDriverRoutes: (routes: Record<string, GeoJSONFeature>) => void
+  patchPositions: (positions: Record<string, TelemetryPosition>) => void
 }
 
 export const useFleetStore = create<FleetState>((set) => ({
@@ -59,6 +65,9 @@ export const useFleetStore = create<FleetState>((set) => ({
   narratorText: null,
   isSimulating: false,
 
+  deviations: [],
+  driverRoutes: {},
+
   setDrivers: (drivers, source) =>
     set({ drivers, dataSource: source, lastUpdated: new Date(), isLoading: false }),
   setSelectedDriver: (id) => set({ selectedDriverId: id }),
@@ -75,4 +84,24 @@ export const useFleetStore = create<FleetState>((set) => ({
   setIsSimulating: (v) => set({ isSimulating: v }),
   clearSimulation: () =>
     set({ simulatedRoute: null, simulationResult: null, narratorText: null }),
+
+  setDeviations: (devs) => set({ deviations: devs }),
+  setDriverRoutes: (routes) => set({ driverRoutes: routes }),
+  patchPositions: (positions) =>
+    set((state) => ({
+      drivers: state.drivers.map((d) => {
+        const pos = positions[d.driver_id]
+        if (!pos) return d
+        return {
+          ...d,
+          location: {
+            ...d.location,
+            lat: pos.lat,
+            lng: pos.lng,
+            speed_mph: pos.speed_mph,
+            heading: pos.heading,
+          },
+        }
+      }),
+    })),
 }))
