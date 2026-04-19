@@ -175,3 +175,49 @@ export interface RouteDeviation {
   corridor: string
   resolved: boolean
 }
+
+export type VisionIssueType =
+  | 'fatigue'
+  | 'phone_distraction'
+  | 'road_hazard'
+  | 'load_security'
+  | 'seatbelt'
+
+export interface VisionIssue {
+  type: VisionIssueType
+  score: number
+  confidence: number
+}
+
+export interface VisionDriverAlert {
+  driver_id: string
+  driver_name: string
+  truck_number: string
+  status: 'clear' | 'watch' | 'critical'
+  attention_score: number
+  confidence: number
+  summary: string
+  recommended_action: string
+  detected_at: string
+  primary_issue: VisionIssueType | null
+  issues: VisionIssue[]
+  video_url: string | null
+}
+
+export interface VisionMonitorFrame {
+  driver_id: string
+  driver_name: string
+  truck_number: string
+  timestamp: string
+  video_url: string | null
+  status: Driver['status']
+  frame: string
+  context: {
+    city: string
+    state: string
+    speed_mph: number
+    hos_remaining_hrs: number
+    load_description: string | null
+    eta: string | null
+  }
+}

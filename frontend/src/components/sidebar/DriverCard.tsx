@@ -1,6 +1,7 @@
 import { MapPin, Clock } from 'lucide-react'
 import { useFleetStore } from '../../store/fleetStore'
 import type { Driver } from '../../types'
+import { getVisionFeedAssignments } from '../../lib/visionFeeds'
 
 const STATUS_CONFIG = {
   driving: { label: 'Driving', color: 'text-green-700 bg-green-50 border border-green-200', dot: 'bg-green-500' },
@@ -31,7 +32,11 @@ interface DriverCardProps {
 export function DriverCard({ driver, index = 0 }: DriverCardProps) {
   const selectedDriverId = useFleetStore((s) => s.selectedDriverId)
   const setSelectedDriver = useFleetStore((s) => s.setSelectedDriver)
+  const drivers = useFleetStore((s) => s.drivers)
+  const visionByDriver = useFleetStore((s) => s.visionByDriver)
   const isSelected = selectedDriverId === driver.driver_id
+  const feedUrl = getVisionFeedAssignments(drivers)[driver.driver_id]
+  const attention = visionByDriver[driver.driver_id]?.attention_score ?? 0
   const cfg = STATUS_CONFIG[driver.status] ?? STATUS_CONFIG.unavailable
   const initials = driver.name.split(' ').map((n) => n[0]).join('')
   const avatarBg = AVATAR_COLORS[index % AVATAR_COLORS.length]
@@ -53,9 +58,16 @@ export function DriverCard({ driver, index = 0 }: DriverCardProps) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-[#202124] truncate">{driver.name}</span>
-            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${cfg.color}`}>
-              {cfg.label}
-            </span>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {feedUrl && (
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${attention >= 80 ? 'bg-red-100 text-red-700' : attention >= 55 ? 'bg-orange-100 text-orange-700' : 'bg-[#e8f0fe] text-[#1a73e8]'}`}>
+                  Vision {attention || 'live'}
+                </span>
+              )}
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${cfg.color}`}>
+                {cfg.label}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-3 mt-0.5 text-xs text-[#5f6368]">
             <span className="flex items-center gap-1">

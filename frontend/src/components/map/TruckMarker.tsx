@@ -19,6 +19,7 @@ export function TruckMarkers({ map }: TruckMarkersProps) {
   const drivers = useFleetStore((s) => s.drivers)
   const selectedDriverId = useFleetStore((s) => s.selectedDriverId)
   const setSelectedDriver = useFleetStore((s) => s.setSelectedDriver)
+  const visionByDriver = useFleetStore((s) => s.visionByDriver)
 
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map())
 
@@ -36,9 +37,10 @@ export function TruckMarkers({ map }: TruckMarkersProps) {
     for (const driver of drivers) {
       const isSelected = driver.driver_id === selectedDriverId
       const color = STATUS_COLOR[driver.status] ?? '#94a3b8'
+      const vision = visionByDriver[driver.driver_id]
 
       if (!markersRef.current.has(driver.driver_id)) {
-        const el = createMarkerEl(driver, color, isSelected)
+        const el = createMarkerEl(driver, color, isSelected, vision?.attention_score ?? 0)
         el.addEventListener('click', (e) => {
           e.stopPropagation()
           setSelectedDriver(driver.driver_id === selectedDriverId ? null : driver.driver_id)
@@ -50,10 +52,10 @@ export function TruckMarkers({ map }: TruckMarkersProps) {
       } else {
         const marker = markersRef.current.get(driver.driver_id)!
         marker.setLngLat([driver.location.lng, driver.location.lat])
-        updateMarkerEl(marker.getElement(), driver, color, isSelected)
+        updateMarkerEl(marker.getElement(), driver, color, isSelected, vision?.attention_score ?? 0)
       }
     }
-  }, [drivers, selectedDriverId])
+  }, [drivers, selectedDriverId, visionByDriver])
 
   useEffect(() => {
     return () => {
@@ -65,17 +67,18 @@ export function TruckMarkers({ map }: TruckMarkersProps) {
   return null
 }
 
-function createMarkerEl(driver: Driver, color: string, isSelected: boolean): HTMLDivElement {
+function createMarkerEl(driver: Driver, color: string, isSelected: boolean, attentionScore: number): HTMLDivElement {
   const el = document.createElement('div')
-  applyStyles(el, driver, color, isSelected)
+  applyStyles(el, driver, color, isSelected, attentionScore)
   return el
 }
 
-function updateMarkerEl(el: HTMLElement, driver: Driver, color: string, isSelected: boolean) {
-  applyStyles(el as HTMLDivElement, driver, color, isSelected)
+function updateMarkerEl(el: HTMLElement, driver: Driver, color: string, isSelected: boolean, attentionScore: number) {
+  applyStyles(el as HTMLDivElement, driver, color, isSelected, attentionScore)
 }
 
-function applyStyles(el: HTMLDivElement, driver: Driver, color: string, isSelected: boolean) {
+function applyStyles(el: HTMLDivElement, driver: Driver, color: string, isSelected: boolean, attentionScore: number) {
+  const riskHalo = attentionScore >= 80 ? 'rgba(239, 68, 68, 0.55)' : attentionScore >= 55 ? 'rgba(249, 115, 22, 0.45)' : attentionScore >= 25 ? 'rgba(251, 191, 36, 0.35)' : null
   const size = isSelected ? 16 : 10
   const pulse = driver.status === 'driving'
 
@@ -87,10 +90,10 @@ function applyStyles(el: HTMLDivElement, driver: Driver, color: string, isSelect
   el.style.background = color
   el.style.border = `${isSelected ? '2.5px' : '1.5px'} solid white`
   el.style.boxShadow = isSelected
-    ? `0 0 0 2px ${color}66, 0 1px 4px rgba(0,0,0,0.4)`
-    : '0 1px 3px rgba(0,0,0,0.35)'
+    ? `0 0 0 2px ${color}66${riskHalo ? `, 0 0 0 10px ${riskHalo}` : ''}, 0 1px 4px rgba(0,0,0,0.4)`
+    : `${riskHalo ? `0 0 0 8px ${riskHalo}, ` : ''}0 1px 3px rgba(0,0,0,0.35)`
   el.style.cursor = 'pointer'
-  el.style.animation = pulse ? 'markerPulse 2s ease-in-out infinite' : 'none'
+  el.style.animation = riskHalo ? 'markerPulse 1.3s ease-in-out infinite' : pulse ? 'markerPulse 2s ease-in-out infinite' : 'none'
   el.style.transition = 'width 0.15s, height 0.15s, box-shadow 0.15s'
   // Dot only — no inner content needed
   while (el.firstChild) el.removeChild(el.firstChild)
