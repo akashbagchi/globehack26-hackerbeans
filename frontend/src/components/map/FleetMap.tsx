@@ -5,6 +5,7 @@ import { useMapbox } from '../../hooks/useMapbox'
 import { useFleetStore } from '../../store/fleetStore'
 import { useUIStore } from '../../store/uiStore'
 import { TruckMarkers } from './TruckMarker'
+import { TruckModelLayer } from './TruckModelLayer'
 import { RouteLayer } from './RouteLayer'
 import { GhostRouteLayer } from './GhostRouteLayer'
 
@@ -49,6 +50,7 @@ export function FleetMap() {
       <div ref={containerRef} className="w-full h-full" />
       {mapReady && map && (
         <>
+          <TruckModelLayer map={map} />
           <TruckMarkers map={map} />
           <RouteLayer map={map} />
           <GhostRouteLayer map={map} />
