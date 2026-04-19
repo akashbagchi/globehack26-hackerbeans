@@ -1,4 +1,5 @@
 'use client'
+import { createClient } from '@insforge/sdk'
 import type {
   Driver,
   DriverRecommendation,
@@ -8,6 +9,10 @@ import type {
   ChatMessage,
   Consignment,
   ConsignmentPayload,
+  TelemetryPosition,
+  RouteDeviation,
+  GeoJSONFeature,
+  FleetAlert,
 } from '../types'
 
 export function getToken(): string | null {
@@ -20,6 +25,10 @@ export function getToken(): string | null {
 const insforgeBaseUrl = process.env.NEXT_PUBLIC_INSFORGE_URL!
 const insforgeAnonKey = process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!
 const operationsBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000'
+const insforge = createClient({
+  baseUrl: insforgeBaseUrl,
+  anonKey: insforgeAnonKey,
+})
 
 type DriverApiRecord = Partial<Driver> & {
   status?: Driver['status']
@@ -262,6 +271,62 @@ export async function deleteConsignment(params: {
       headers: { Accept: 'application/json' },
     },
   )
+}
+
+export async function fetchAlerts(): Promise<FleetAlert[]> {
+  const { data, error } = await insforge.database
+    .from('fleet_alerts')
+    .select()
+    .order('created_at', { ascending: false })
+  if (error) throw new Error(String(error))
+  return (data ?? []) as unknown as FleetAlert[]
+}
+
+export async function dismissAlert(alertId: string): Promise<void> {
+  await insforge.database
+    .from('fleet_alerts')
+    .update({ status: 'dismissed', resolved_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('alert_id', alertId)
+}
+
+export async function runReconciliation(): Promise<{ alerts_generated: number; breakdown: Record<string, number> }> {
+  const { data, error } = await insforge.functions.invoke('reconcile')
+  if (error) throw new Error(String(error))
+  return data
+}
+
+export async function fetchTelemetryPositions(): Promise<Record<string, TelemetryPosition>> {
+  const { data, error } = await insforge.database.from('telemetry_positions').select()
+  if (error) throw new Error(String(error))
+  const result: Record<string, TelemetryPosition> = {}
+  for (const row of data ?? []) {
+    result[row.driver_id as string] = row as unknown as TelemetryPosition
+  }
+  return result
+}
+
+export async function fetchTelemetryRoutes(
+  opts?: { raw?: boolean },
+): Promise<RouteRow[] | Record<string, GeoJSONFeature>> {
+  const { data, error } = await insforge.database.from('driver_routes').select()
+  if (error) throw new Error(String(error))
+  if (opts?.raw) return (data ?? []) as RouteRow[]
+  const result: Record<string, GeoJSONFeature> = {}
+  for (const row of data ?? []) {
+    result[row.driver_id as string] = row.geojson as unknown as GeoJSONFeature
+  }
+  return result
+}
+
+export async function fetchTelemetryDeviations(): Promise<RouteDeviation[]> {
+  const { data, error } = await insforge.database.from('route_deviations').select()
+  if (error) throw new Error(String(error))
+  return (data ?? []) as unknown as RouteDeviation[]
+}
+
+type RouteRow = {
+  driver_id: string
+  geojson: GeoJSONFeature
 }
 
 function buildFleetSummary(drivers: Driver[]): string {

@@ -35,13 +35,13 @@ app.include_router(events.router)
 
 
 @app.on_event("startup")
-async def startup_event_bus():
+async def startup():
     register_core_consumers(event_bus)
     await event_bus.start()
 
 
 @app.on_event("shutdown")
-async def shutdown_event_bus():
+async def shutdown():
     await event_bus.stop()
 
 

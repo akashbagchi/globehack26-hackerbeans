@@ -7,6 +7,7 @@ from app.models.events import (
     BreakdownEvent,
     FleetEvent,
     HOSThresholdWarningEvent,
+    RouteDeviationEvent,
     TelemetryUpdateEvent,
 )
 from app.services.event_bus import FleetEventBus
@@ -55,6 +56,18 @@ async def _watch_hos_alerts(event: FleetEvent) -> None:
     )
 
 
+async def _watch_route_deviations(event: FleetEvent) -> None:
+    if not isinstance(event, RouteDeviationEvent):
+        return
+    logger.warning(
+        "route deviation [%s] driver=%s %.1f mi off-route in %s",
+        event.payload.severity,
+        event.payload.driver_id,
+        event.payload.deviation_miles,
+        event.payload.corridor,
+    )
+
+
 def register_core_consumers(bus: FleetEventBus) -> None:
     bus.register_handler("telemetry.update.v1", _log_event)
     bus.register_handler("telemetry.update.v1", _watch_telemetry)
@@ -64,3 +77,5 @@ def register_core_consumers(bus: FleetEventBus) -> None:
     bus.register_handler("hos.threshold_warning.v1", _watch_hos_alerts)
     bus.register_handler("breakdown.reported.v1", _log_event)
     bus.register_handler("breakdown.reported.v1", _watch_breakdowns)
+    bus.register_handler("route.deviation_detected.v1", _log_event)
+    bus.register_handler("route.deviation_detected.v1", _watch_route_deviations)

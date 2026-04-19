@@ -9,26 +9,30 @@ interface RouteLayerProps {
 export function RouteLayer({ map }: RouteLayerProps) {
   const drivers = useFleetStore((s) => s.drivers)
   const selectedDriverId = useFleetStore((s) => s.selectedDriverId)
+  const driverRoutes = useFleetStore((s) => s.driverRoutes)
 
   useEffect(() => {
     if (!selectedDriverId) {
-      removeAllRouteLayers(map)
+      removeRouteLayers(map)
       return
     }
 
     const driver = drivers.find((d) => d.driver_id === selectedDriverId)
     if (!driver?.current_load) {
-      removeAllRouteLayers(map)
+      removeRouteLayers(map)
       return
     }
 
-    removeAllRouteLayers(map)
+    removeRouteLayers(map)
 
-    const coords: [number, number][] = [
-      [driver.location.lng, driver.location.lat],
-      [driver.location.lng + (Math.random() - 0.5) * 4, driver.location.lat + (Math.random() - 0.5) * 2],
-      [driver.location.lng + (Math.random() - 0.5) * 8, driver.location.lat + (Math.random() - 0.5) * 4],
-    ]
+    // Use real OSRM route if available, otherwise fall back to dest straight line
+    const realRoute = driverRoutes[selectedDriverId]
+    const coords: [number, number][] = realRoute
+      ? (realRoute.geometry.coordinates as [number, number][])
+      : [
+          [driver.location.lng, driver.location.lat],
+          [driver.location.lng + (Math.random() - 0.5) * 4, driver.location.lat + (Math.random() - 0.5) * 2],
+        ]
 
     const sourceId = 'active-route'
     const glowId = 'active-route-glow'
@@ -37,11 +41,7 @@ export function RouteLayer({ map }: RouteLayerProps) {
     if (!map.getSource(sourceId)) {
       map.addSource(sourceId, {
         type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: { type: 'LineString', coordinates: coords },
-          properties: {},
-        },
+        data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} },
       })
     } else {
       ;(map.getSource(sourceId) as GeoJSONSource).setData({
@@ -69,12 +69,12 @@ export function RouteLayer({ map }: RouteLayerProps) {
         paint: { 'line-color': '#f59e0b', 'line-width': 3, 'line-opacity': 0.9 },
       })
     }
-  }, [selectedDriverId, drivers])
+  }, [selectedDriverId, drivers, driverRoutes])
 
   return null
 }
 
-function removeAllRouteLayers(map: MapboxMap) {
+function removeRouteLayers(map: MapboxMap) {
   for (const id of ['active-route-glow', 'active-route-core']) {
     if (map.getLayer(id)) map.removeLayer(id)
   }

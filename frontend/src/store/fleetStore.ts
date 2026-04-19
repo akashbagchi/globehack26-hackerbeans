@@ -7,6 +7,9 @@ import type {
   SimulationResult,
   GeoJSONFeature,
   Consignment,
+  RouteDeviation,
+  TelemetryPosition,
+  FleetAlert,
 } from '../types'
 
 function todayIsoDate() {
@@ -41,6 +44,11 @@ interface FleetState {
   isSavingConsignment: boolean
   consignmentError: string | null
 
+  deviations: RouteDeviation[]
+  driverRoutes: Record<string, GeoJSONFeature>
+  alerts: FleetAlert[]
+  isLoadingAlerts: boolean
+
   setDrivers: (drivers: Driver[], source: 'navpro' | 'mock' | 'insforge') => void
   setConsignments: (consignments: Consignment[]) => void
   setSelectedDriver: (id: string | null) => void
@@ -61,6 +69,11 @@ interface FleetState {
   upsertConsignment: (consignment: Consignment) => void
   removeConsignment: (consignmentId: string) => void
   clearSimulation: () => void
+  setDeviations: (devs: RouteDeviation[]) => void
+  setDriverRoutes: (routes: Record<string, GeoJSONFeature>) => void
+  patchPositions: (positions: Record<string, TelemetryPosition>) => void
+  setAlerts: (alerts: FleetAlert[]) => void
+  setIsLoadingAlerts: (v: boolean) => void
 }
 
 export const useFleetStore = create<FleetState>((set) => ({
@@ -90,6 +103,11 @@ export const useFleetStore = create<FleetState>((set) => ({
   isLoadingConsignments: false,
   isSavingConsignment: false,
   consignmentError: null,
+
+  deviations: [],
+  driverRoutes: {},
+  alerts: [],
+  isLoadingAlerts: false,
 
   setDrivers: (drivers, source) =>
     set({ drivers, dataSource: source, lastUpdated: new Date(), isLoading: false }),
@@ -131,4 +149,26 @@ export const useFleetStore = create<FleetState>((set) => ({
     })),
   clearSimulation: () =>
     set({ simulatedRoute: null, simulationResult: null, narratorText: null }),
+
+  setDeviations: (devs) => set({ deviations: devs }),
+  setDriverRoutes: (routes) => set({ driverRoutes: routes }),
+  setAlerts: (alerts) => set({ alerts, isLoadingAlerts: false }),
+  setIsLoadingAlerts: (v) => set({ isLoadingAlerts: v }),
+  patchPositions: (positions) =>
+    set((state) => ({
+      drivers: state.drivers.map((d) => {
+        const pos = positions[d.driver_id]
+        if (!pos) return d
+        return {
+          ...d,
+          location: {
+            ...d.location,
+            lat: pos.lat,
+            lng: pos.lng,
+            speed_mph: pos.speed_mph,
+            heading: pos.heading,
+          },
+        }
+      }),
+    })),
 }))
