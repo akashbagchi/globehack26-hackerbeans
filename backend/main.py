@@ -7,7 +7,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from app.config import settings
 from app.limiter import limiter
-from app.routers import fleet, dispatch, chat, operations, simulate
+from app.routers import fleet, dispatch, chat, operations, simulate, auth
 
 app = FastAPI(title="Sauron Fleet API", version="1.0.0")
 
@@ -23,6 +23,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
+app.include_router(auth.router)
 app.include_router(fleet.router)
 app.include_router(dispatch.router)
 app.include_router(chat.router)
