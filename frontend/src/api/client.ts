@@ -9,6 +9,7 @@ import type {
   ChatMessage,
   Consignment,
   ConsignmentPayload,
+  ReceiverNotification,
   TelemetryPosition,
   RouteDeviation,
   GeoJSONFeature,
@@ -230,6 +231,21 @@ export async function fetchConsignmentById(params: {
   const search = new URLSearchParams({ fleet_id: params.fleetId })
   return requestOperations(
     `${operationsBaseUrl}/operations/consignments/${params.consignmentId}?${search.toString()}`,
+    {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    },
+  )
+}
+
+export async function fetchConsignmentNotifications(params: {
+  fleetId: string
+  consignmentId: string
+}): Promise<{ data: ReceiverNotification[]; count: number; fleet_id: string }> {
+  const search = new URLSearchParams({ fleet_id: params.fleetId })
+  return requestOperations(
+    `${operationsBaseUrl}/operations/consignments/${params.consignmentId}/notifications?${search.toString()}`,
     {
       method: 'GET',
       headers: { Accept: 'application/json' },
