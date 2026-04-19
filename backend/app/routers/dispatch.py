@@ -4,15 +4,16 @@ from datetime import date, datetime, timezone
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 
-from app.models.load import LoadRequest
-from app.models.events import AssignmentDecisionEvent, AssignmentDecisionPayload
-from app.services.navpro import get_drivers
-from app.services.claude import get_cost_insights, enrich_recommendations_with_ai
-from app.services.eligibility import evaluate_driver_for_load
-from app.services.scoring import score_drivers
-from app.services.event_bus import event_bus
-from app.services.orchestrator import orchestrate_daily_dispatch
 from app.limiter import limiter
+from app.models.events import AssignmentDecisionEvent, AssignmentDecisionPayload
+from app.models.load import LoadRequest
+from app.services.claude import get_cost_insights, enrich_recommendations_with_ai
+from app.services.dispatch_scoring import build_dispatch_scoring_signals
+from app.services.eligibility import evaluate_driver_for_load
+from app.services.event_bus import event_bus
+from app.services.navpro import get_drivers
+from app.services.orchestrator import orchestrate_daily_dispatch
+from app.services.scoring import score_drivers
 
 
 class OrchestrationRequest(BaseModel):
@@ -33,6 +34,10 @@ async def recommend_dispatch(
     request: Request,
     req: LoadRequest,
     enrich_with_ai: bool = Query(default=False),
+    fleet_id: str | None = Query(default=None),
+    include_historical_signals: bool = Query(default=False),
+    history_from: datetime | None = Query(default=None, alias="history_from"),
+    history_to: datetime | None = Query(default=None, alias="history_to"),
 ):
     drivers, source = await get_drivers()
     evaluations = [
@@ -69,19 +74,38 @@ async def recommend_dispatch(
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
+    historical_signals = None
+    if include_historical_signals and fleet_id:
+        historical_signals = await build_dispatch_scoring_signals(
+            fleet_id=fleet_id,
+            pickup=req.pickup,
+            destination=req.destination,
+            eligible_drivers=eligible_drivers,
+            from_ts=history_from,
+            to_ts=history_to,
+        )
+
     result = score_drivers(
-        eligible_drivers, req.pickup, req.destination, req.cargo, req.weight_lbs
+        eligible_drivers,
+        req.pickup,
+        req.destination,
+        req.cargo,
+        req.weight_lbs,
+        historical_signals=historical_signals,
     )
 
     if enrich_with_ai:
         result = await enrich_recommendations_with_ai(result)
 
-    return {
+    response = {
         "data": result.model_dump(),
         "source": source,
         "scoring": "deterministic",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    if historical_signals:
+        response["historical_signals"] = historical_signals.model_dump(mode="json")
+    return response
 
 
 @router.post("/orchestrate")

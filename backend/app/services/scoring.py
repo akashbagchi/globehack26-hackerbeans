@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 from app.models.ai import DispatchRecommendation, DriverRecommendation
+from app.models.analytics import DispatchHistoricalSignal, DispatchScoringSignalsReport
 from app.models.driver import Driver
 from app.services.navpro import AVG_SPEED_MPH, haversine_miles, resolve_coords
 
@@ -20,6 +21,7 @@ class ScoringWeights:
     readiness: float = 0.10
     capacity_utilization: float = 0.10
     fuel_adequacy: float = 0.05
+    historical_fit: float = 0.15
 
 
 @dataclass
@@ -38,6 +40,7 @@ class _DriverFactors:
     hos_surplus_hrs: float
     factors: dict[str, float] = field(default_factory=dict)
     score: int = 0
+    historical_signal: DispatchHistoricalSignal | None = None
 
 
 def score_drivers(
@@ -47,6 +50,7 @@ def score_drivers(
     cargo: str,
     weight_lbs: int,
     config: ScoringConfig | None = None,
+    historical_signals: DispatchScoringSignalsReport | None = None,
 ) -> DispatchRecommendation:
     if config is None:
         config = ScoringConfig()
@@ -79,12 +83,15 @@ def score_drivers(
             )
         )
 
-    # Fleet-level stats for relative cost normalization
     cpms = [e.driver.economics.cost_per_mile for e in entries]
     min_cpm, max_cpm = min(cpms), max(cpms)
     cpm_range = max_cpm - min_cpm
-
     avg_cpm = sum(cpms) / len(cpms)
+    historical_signal_map = (
+        {signal.driver_id: signal for signal in historical_signals.driver_signals}
+        if historical_signals
+        else {}
+    )
 
     w = config.weights
 
@@ -98,6 +105,12 @@ def score_drivers(
         readiness = _clamp(d.readiness.score / 100.0)
         cap_util = _clamp(weight_lbs / d.vehicle.capacity_lbs) if d.vehicle.capacity_lbs > 0 else 0.0
         fuel = _clamp(d.vehicle.fuel_level_pct / 100.0)
+        historical_signal = historical_signal_map.get(d.driver_id)
+        historical_fit = (
+            _clamp((historical_signal.historical_score + 25) / 125.0)
+            if historical_signal
+            else 0.5
+        )
 
         entry.factors = {
             "proximity": proximity,
@@ -106,7 +119,9 @@ def score_drivers(
             "readiness": readiness,
             "capacity_utilization": cap_util,
             "fuel_adequacy": fuel,
+            "historical_fit": historical_fit,
         }
+        entry.historical_signal = historical_signal
 
         raw = (
             w.proximity * proximity
@@ -115,10 +130,10 @@ def score_drivers(
             + w.readiness * readiness
             + w.capacity_utilization * cap_util
             + w.fuel_adequacy * fuel
+            + w.historical_fit * historical_fit
         )
         entry.score = round(raw * 100)
 
-    # Sort: score desc, cost asc, driver_id asc for deterministic tie-breaking
     entries.sort(key=lambda e: (-e.score, e.driver.economics.cost_per_mile, e.driver.driver_id))
 
     results = entries[: config.max_results]
@@ -127,7 +142,7 @@ def score_drivers(
     for rank, entry in enumerate(results, start=1):
         d = entry.driver
         cost_delta = d.economics.cost_per_mile - avg_cpm
-        reasoning = _build_reasoning(entry, avg_cpm)
+        reasoning = _build_reasoning(entry)
 
         recommendations.append(
             DriverRecommendation(
@@ -158,7 +173,7 @@ def score_drivers(
     return DispatchRecommendation(recommendations=recommendations, dispatch_note=note)
 
 
-def _build_reasoning(entry: _DriverFactors, avg_cpm: float) -> str:
+def _build_reasoning(entry: _DriverFactors) -> str:
     d = entry.driver
     factor_labels = {
         "proximity": f"{entry.deadhead_miles:.0f}mi deadhead",
@@ -167,9 +182,13 @@ def _build_reasoning(entry: _DriverFactors, avg_cpm: float) -> str:
         "readiness": f"readiness {d.readiness.score}/100",
         "capacity_utilization": f"{entry.factors['capacity_utilization'] * 100:.0f}% capacity used",
         "fuel_adequacy": f"fuel at {d.vehicle.fuel_level_pct:.0f}%",
+        "historical_fit": (
+            f"historical score {entry.historical_signal.historical_score:.0f}"
+            if entry.historical_signal
+            else "no lane history"
+        ),
     }
 
-    # Sort factors by weighted contribution descending
     weights = ScoringWeights()
     weighted = sorted(
         entry.factors.items(),
@@ -186,5 +205,10 @@ def _build_reasoning(entry: _DriverFactors, avg_cpm: float) -> str:
 
     total_miles = entry.deadhead_miles + entry.haul_miles
     parts.append(f"est. {total_miles:.0f} total miles")
+    if entry.historical_signal:
+        parts.append(
+            f"lane completion {entry.historical_signal.completion_rate:.0%}, "
+            f"delay {entry.historical_signal.delay_rate:.0%}"
+        )
 
     return ". ".join(parts) + "."

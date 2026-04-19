@@ -3,6 +3,13 @@ from datetime import date, datetime, timezone
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.models.domain import ConsignmentCreate, ConsignmentUpdate
+from app.services.dispatch_scoring import build_dispatch_scoring_signals
+from app.services.navpro import get_drivers
+from app.services.operational_analytics import (
+    get_fleet_performance_report,
+    get_historical_operational_metrics,
+    get_next_day_planning_report,
+)
 from app.services.operations import (
     OperationsServiceConflict,
     OperationsServiceError,
@@ -18,6 +25,136 @@ from app.services.operations import (
 )
 
 router = APIRouter(prefix="/operations", tags=["operations"])
+
+
+@router.get("/analytics/history")
+async def get_operational_history(
+    fleet_id: str = Query(...),
+    origin: str | None = Query(default=None),
+    destination: str | None = Query(default=None),
+    driver_id: str | None = Query(default=None),
+    truck_id: str | None = Query(default=None),
+    from_ts: datetime | None = Query(default=None, alias="from"),
+    to_ts: datetime | None = Query(default=None, alias="to"),
+):
+    try:
+        report = await get_historical_operational_metrics(
+            fleet_id=fleet_id,
+            origin=origin,
+            destination=destination,
+            driver_id=driver_id,
+            truck_id=truck_id,
+            from_ts=from_ts,
+            to_ts=to_ts,
+        )
+    except OperationsServiceNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationsServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "data": report.model_dump(mode="json"),
+        "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/analytics/dispatch-signals")
+async def get_dispatch_signals(
+    fleet_id: str = Query(...),
+    pickup: str = Query(...),
+    destination: str = Query(...),
+    from_ts: datetime | None = Query(default=None, alias="from"),
+    to_ts: datetime | None = Query(default=None, alias="to"),
+):
+    try:
+        drivers, _ = await get_drivers()
+        report = await build_dispatch_scoring_signals(
+            fleet_id=fleet_id,
+            pickup=pickup,
+            destination=destination,
+            eligible_drivers=drivers,
+            from_ts=from_ts,
+            to_ts=to_ts,
+        )
+    except OperationsServiceNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationsServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "data": report.model_dump(mode="json"),
+        "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/analytics/fleet-report")
+async def get_fleet_report(
+    fleet_id: str = Query(...),
+    origin: str | None = Query(default=None),
+    destination: str | None = Query(default=None),
+    driver_id: str | None = Query(default=None),
+    truck_id: str | None = Query(default=None),
+    from_ts: datetime | None = Query(default=None, alias="from"),
+    to_ts: datetime | None = Query(default=None, alias="to"),
+):
+    try:
+        report = await get_fleet_performance_report(
+            fleet_id=fleet_id,
+            origin=origin,
+            destination=destination,
+            driver_id=driver_id,
+            truck_id=truck_id,
+            from_ts=from_ts,
+            to_ts=to_ts,
+        )
+    except OperationsServiceNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationsServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "data": report.model_dump(mode="json"),
+        "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/analytics/next-day-plan")
+async def get_next_day_plan(
+    fleet_id: str = Query(...),
+    origin: str | None = Query(default=None),
+    destination: str | None = Query(default=None),
+    driver_id: str | None = Query(default=None),
+    truck_id: str | None = Query(default=None),
+    from_ts: datetime | None = Query(default=None, alias="from"),
+    to_ts: datetime | None = Query(default=None, alias="to"),
+):
+    try:
+        report = await get_next_day_planning_report(
+            fleet_id=fleet_id,
+            origin=origin,
+            destination=destination,
+            driver_id=driver_id,
+            truck_id=truck_id,
+            from_ts=from_ts,
+            to_ts=to_ts,
+        )
+    except OperationsServiceNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationsServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "data": report.model_dump(mode="json"),
+        "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/consignments")
