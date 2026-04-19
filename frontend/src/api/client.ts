@@ -1,6 +1,21 @@
 'use client'
 import { createClient } from '@insforge/sdk'
-import type { Driver, DriverRecommendation, InsightCard, CostChartEntry, SimulationResult, ChatMessage, TelemetryPosition, RouteDeviation, GeoJSONFeature, FleetAlert, VisionDriverAlert, VisionMonitorFrame } from '../types'
+import type {
+  Driver,
+  DriverRecommendation,
+  InsightCard,
+  CostChartEntry,
+  SimulationResult,
+  ChatMessage,
+  Consignment,
+  ConsignmentPayload,
+  TelemetryPosition,
+  RouteDeviation,
+  GeoJSONFeature,
+  FleetAlert,
+  VisionDriverAlert,
+  VisionMonitorFrame,
+} from '../types'
 
 export function getToken(): string | null {
   try {
@@ -9,12 +24,29 @@ export function getToken(): string | null {
   } catch { return null }
 }
 
+const insforgeBaseUrl = process.env.NEXT_PUBLIC_INSFORGE_URL!
+const insforgeAnonKey = process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!
+const operationsBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000'
 const insforge = createClient({
-  baseUrl: process.env.NEXT_PUBLIC_INSFORGE_URL!,
-  anonKey: process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!,
+  baseUrl: insforgeBaseUrl,
+  anonKey: insforgeAnonKey,
 })
 
-function normalizeDriver(raw: Partial<Driver> & Record<string, any>): Driver {
+type DriverApiRecord = Partial<Driver> & {
+  status?: Driver['status']
+  current_load?: Driver['current_load']
+}
+
+type LoginResponse = {
+  access_token: string
+  dispatcher_id: string
+  name: string
+  email: string
+  fleet_id: string
+  error?: string
+}
+
+function normalizeDriver(raw: DriverApiRecord): Driver {
   const status = raw.status ?? 'unavailable'
   const currentLoad = raw.current_load ?? null
 
@@ -52,19 +84,56 @@ function normalizeDriver(raw: Partial<Driver> & Record<string, any>): Driver {
   } as Driver
 }
 
-export async function loginDispatcher(email: string, password: string) {
-  const { data, error } = await insforge.functions.invoke('auth-login', {
-    body: { email, password },
+async function requestInsforge<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${insforgeBaseUrl}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${insforgeAnonKey}`,
+      ...(init?.headers ?? {}),
+    },
   })
-  if (error) throw new Error('Invalid email or password')
+
+  if (!response.ok) {
+    let detail = `InsForge request failed (${response.status})`
+    try {
+      const payload = await response.json()
+      detail = payload?.error ?? payload?.detail ?? detail
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail)
+  }
+
+  if (response.status === 204) {
+    return undefined as T
+  }
+
+  return response.json() as Promise<T>
+}
+
+async function invokeFunction<T>(slug: string, body?: unknown): Promise<T> {
+  return requestInsforge<T>(`/functions/${slug}`, {
+    method: body ? 'POST' : 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+}
+
+export async function loginDispatcher(email: string, password: string) {
+  const data = await invokeFunction<LoginResponse>('auth-login', { email, password })
   if (data?.error) throw new Error(data.error)
   return data
 }
 
 export async function fetchDrivers(): Promise<{ drivers: Driver[]; source: string }> {
-  const { data, error } = await insforge.database.from('drivers').select()
-  if (error) throw new Error(String(error))
-  return { drivers: (data ?? []).map((driver) => normalizeDriver(driver as Record<string, any>)), source: 'insforge' }
+  const rows = await requestInsforge<DriverApiRecord[]>('/api/database/records/drivers', {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  })
+  return { drivers: rows.map((driver) => normalizeDriver(driver)), source: 'insforge' }
 }
 
 export async function fetchDispatchRecommendations(payload: {
@@ -73,8 +142,10 @@ export async function fetchDispatchRecommendations(payload: {
   cargo: string
   weight_lbs: number
 }): Promise<{ recommendations: DriverRecommendation[]; dispatch_note: string }> {
-  const { data, error } = await insforge.functions.invoke('dispatch-recommend', { body: payload })
-  if (error) throw new Error(String(error))
+  const data = await invokeFunction<{ data: { recommendations: DriverRecommendation[]; dispatch_note: string } }>(
+    'dispatch-recommend',
+    payload,
+  )
   return data.data
 }
 
@@ -82,8 +153,9 @@ export async function fetchCostInsights(): Promise<{
   chart_data: CostChartEntry[]
   insights: InsightCard[]
 }> {
-  const { data, error } = await insforge.functions.invoke('cost-insights')
-  if (error) throw new Error(String(error))
+  const data = await invokeFunction<{ data: { chart_data: CostChartEntry[]; insights: InsightCard[] } }>(
+    'cost-insights',
+  )
   return data.data
 }
 
@@ -92,9 +164,115 @@ export async function fetchSimulation(payload: {
   pickup: string
   destination: string
 }): Promise<SimulationResult> {
-  const { data, error } = await insforge.functions.invoke('simulate-assignment', { body: payload })
-  if (error) throw new Error(String(error))
+  const data = await invokeFunction<{ data: SimulationResult }>('simulate-assignment', payload)
   return data.data
+}
+
+async function parseOperationsResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let detail = 'Request failed'
+    try {
+      const payload = await response.json()
+      if (Array.isArray(payload?.detail)) {
+        detail = payload.detail.map((item: { msg?: string; loc?: string[] }) => {
+          const field = Array.isArray(item.loc) ? item.loc[item.loc.length - 1] : undefined
+          return field ? `${field}: ${item.msg ?? 'Invalid value'}` : item.msg ?? 'Invalid request'
+        }).join('; ')
+      } else {
+        detail = payload?.detail ?? detail
+      }
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail)
+  }
+  return response.json() as Promise<T>
+}
+
+async function requestOperations<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
+  try {
+    const response = await fetch(input, init)
+    return await parseOperationsResponse<T>(response)
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        'Dispatch services are unreachable. Confirm the FastAPI backend is running on NEXT_PUBLIC_API_BASE_URL.',
+        { cause: error },
+      )
+    }
+    throw error
+  }
+}
+
+export async function fetchDailyConsignments(params: {
+  fleetId: string
+  dispatchDate: string
+  status?: string
+}): Promise<{ data: Consignment[]; count: number; fleet_id: string }> {
+  const search = new URLSearchParams({
+    fleet_id: params.fleetId,
+    dispatch_date: params.dispatchDate,
+  })
+  if (params.status) search.set('status', params.status)
+
+  return requestOperations(`${operationsBaseUrl}/operations/consignments?${search.toString()}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  })
+}
+
+export async function fetchConsignmentById(params: {
+  fleetId: string
+  consignmentId: string
+}): Promise<{ data: Consignment }> {
+  const search = new URLSearchParams({ fleet_id: params.fleetId })
+  return requestOperations(
+    `${operationsBaseUrl}/operations/consignments/${params.consignmentId}?${search.toString()}`,
+    {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    },
+  )
+}
+
+export async function createConsignment(payload: ConsignmentPayload): Promise<{ data: Consignment }> {
+  return requestOperations(`${operationsBaseUrl}/operations/consignments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function updateConsignment(params: {
+  fleetId: string
+  consignmentId: string
+  payload: Partial<ConsignmentPayload>
+}): Promise<{ data: Consignment }> {
+  const search = new URLSearchParams({ fleet_id: params.fleetId })
+  return requestOperations(
+    `${operationsBaseUrl}/operations/consignments/${params.consignmentId}?${search.toString()}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(params.payload),
+    },
+  )
+}
+
+export async function deleteConsignment(params: {
+  fleetId: string
+  consignmentId: string
+}): Promise<void> {
+  const search = new URLSearchParams({ fleet_id: params.fleetId })
+  await requestOperations<void>(
+    `${operationsBaseUrl}/operations/consignments/${params.consignmentId}?${search.toString()}`,
+    {
+      method: 'DELETE',
+      headers: { Accept: 'application/json' },
+    },
+  )
 }
 
 export async function fetchAlerts(): Promise<FleetAlert[]> {
@@ -114,7 +292,7 @@ export async function dismissAlert(alertId: string): Promise<void> {
 }
 
 export async function runReconciliation(): Promise<{ alerts_generated: number; breakdown: Record<string, number> }> {
-  const { data, error } = await insforge.functions.invoke('reconcile', { method: 'GET' } as any)
+  const { data, error } = await insforge.functions.invoke('reconcile')
   if (error) throw new Error(String(error))
   return data
 }
@@ -129,10 +307,12 @@ export async function fetchTelemetryPositions(): Promise<Record<string, Telemetr
   return result
 }
 
-export async function fetchTelemetryRoutes(opts?: { raw?: boolean }): Promise<any> {
+export async function fetchTelemetryRoutes(
+  opts?: { raw?: boolean },
+): Promise<RouteRow[] | Record<string, GeoJSONFeature>> {
   const { data, error } = await insforge.database.from('driver_routes').select()
   if (error) throw new Error(String(error))
-  if (opts?.raw) return data ?? []
+  if (opts?.raw) return (data ?? []) as RouteRow[]
   const result: Record<string, GeoJSONFeature> = {}
   for (const row of data ?? []) {
     result[row.driver_id as string] = row.geojson as unknown as GeoJSONFeature
@@ -152,6 +332,11 @@ export async function runVisionMonitor(payload: {
   const { data, error } = await insforge.functions.invoke('vision-monitor', { body: payload })
   if (error) throw new Error(String(error))
   return data.data
+}
+
+type RouteRow = {
+  driver_id: string
+  geojson: GeoJSONFeature
 }
 
 function buildFleetSummary(drivers: Driver[]): string {

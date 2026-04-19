@@ -2,11 +2,10 @@ import { Map, BarChart2, MessageSquare, Bell } from 'lucide-react'
 import { useUIStore } from '../../store/uiStore'
 import { TopBar } from './TopBar'
 import { FleetMap } from '../map/FleetMap'
-import { DriverSidebar } from '../sidebar/DriverSidebar'
-import { DriverDetail } from '../sidebar/DriverDetail'
 import { CostPanel } from '../costs/CostPanel'
 import { ChatPanel } from '../chat/ChatPanel'
 import { NarratorBanner } from '../narrator/NarratorBanner'
+import { DispatchWorkspace } from '../dispatch/DispatchWorkspace'
 import { AlertsPanel } from '../alerts/AlertsPanel'
 import { useFleetStore } from '../../store/fleetStore'
 
@@ -20,12 +19,9 @@ const ICON_TABS = [
 export function AppShell() {
   const activePanel = useUIStore((s) => s.activePanel)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
-  const selectedDriverId = useFleetStore((s) => s.selectedDriverId)
   const alerts = useFleetStore((s) => s.alerts)
 
   const unresolvedCount = alerts.filter((a) => a.status === 'unresolved').length
-  const showDriverDetail = activePanel === 'dispatch' && selectedDriverId
-  const showDriverList = activePanel === 'dispatch'
 
   return (
     <div className="flex flex-col h-screen w-screen bg-white overflow-hidden">
@@ -62,8 +58,7 @@ export function AppShell() {
 
         {/* Left panel */}
         <div className="w-116 shrink-0 bg-white border-r border-[#dadce0] flex flex-col min-h-0">
-          {showDriverList && !selectedDriverId && <DriverSidebar />}
-          {showDriverDetail && <DriverDetail />}
+          {activePanel === 'dispatch' && <DispatchWorkspace />}
           {activePanel === 'costs' && <CostPanel />}
           {activePanel === 'chat' && <ChatPanel />}
           {activePanel === 'alerts' && <AlertsPanel />}

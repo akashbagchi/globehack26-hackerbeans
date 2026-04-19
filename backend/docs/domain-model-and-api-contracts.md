@@ -75,6 +75,17 @@ Operational timeline tables should also include:
 
 - a domain event timestamp such as `occurred_at`, `checked_in_at`, `sent_at`, or `event_date`
 
+Dispatch-facing consignment fields should also include:
+
+- `pickup_window_start_at`
+- `pickup_window_end_at`
+- `delivery_window_start_at`
+- `delivery_window_end_at`
+- `cargo_class`
+- `weight_lbs`
+- `special_handling`
+- `receiver_contact_preferences`
+
 ## State machines
 
 Driver states:
@@ -103,8 +114,10 @@ To satisfy the issue acceptance criteria, storage must support:
 
 - query by `fleet_id`
 - query by date range
+- query a single dispatch day for board workflows
 - query active vs historical assignments
 - query event history for a consignment, driver, or truck
+- query `status = unassigned` consignments for auto-dispatch
 
 Recommended indexes:
 
@@ -199,6 +212,25 @@ Response:
 ### Consignment list by status and date
 
 `GET /operations/consignments?fleet_id={fleet_id}&status={status}&from={timestamp}&to={timestamp}`
+
+For day-based dispatch workflows, the API should also accept:
+
+`GET /operations/consignments?fleet_id={fleet_id}&dispatch_date=2026-04-18`
+
+### Consignment CRUD
+
+- `GET /operations/consignments/{consignment_id}?fleet_id={fleet_id}`
+- `POST /operations/consignments`
+- `PATCH /operations/consignments/{consignment_id}?fleet_id={fleet_id}`
+- `DELETE /operations/consignments/{consignment_id}?fleet_id={fleet_id}`
+
+Create and update payloads should support:
+
+- pickup and delivery windows
+- cargo class
+- weight
+- special handling
+- receiver contact preferences
 
 ### Assignment history
 

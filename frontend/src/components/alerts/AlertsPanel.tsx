@@ -1,11 +1,12 @@
 'use client'
 import { useEffect, useState } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import { RefreshCw, X, Clock, CreditCard, AlertTriangle, Truck, Navigation } from 'lucide-react'
 import { useFleetStore } from '../../store/fleetStore'
 import { fetchAlerts, dismissAlert, runReconciliation } from '../../api/client'
 import type { FleetAlert } from '../../types'
 
-const TYPE_CONFIG: Record<FleetAlert['alert_type'], { label: string; Icon: any }> = {
+const TYPE_CONFIG: Record<FleetAlert['alert_type'], { label: string; Icon: LucideIcon }> = {
   late_delivery:       { label: 'Late Delivery',       Icon: Clock },
   missed_checkin:      { label: 'Missed Check-In',     Icon: Navigation },
   hos_risk:            { label: 'HOS Risk',             Icon: Truck },
@@ -130,7 +131,7 @@ export function AlertsPanel() {
             return (
               <button
                 key={type}
-                onClick={() => setFilter(type as any)}
+                onClick={() => setFilter(type)}
                 className={`px-2 py-0.5 rounded text-xs transition-colors ${
                   filter === type
                     ? 'bg-[#1a73e8] text-white'

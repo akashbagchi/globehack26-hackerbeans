@@ -50,7 +50,7 @@ export function useTelemetryPolling() {
     async function init() {
       try {
         // Fetch routes once — they include all sim params
-        const rawRoutes = await (fetchTelemetryRoutes as any)({ raw: true })
+        const rawRoutes = await fetchTelemetryRoutes({ raw: true }) as RouteRow[]
         if (!mounted) return
         routesRef.current = rawRoutes
 
