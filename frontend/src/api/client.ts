@@ -13,6 +13,7 @@ import type {
   RouteDeviation,
   GeoJSONFeature,
   FleetAlert,
+  OrchestrationResult,
   VisionDriverAlert,
   VisionMonitorFrame,
 } from '../types'
@@ -273,6 +274,24 @@ export async function deleteConsignment(params: {
       headers: { Accept: 'application/json' },
     },
   )
+}
+
+export async function orchestrateDailyDispatch(params: {
+  fleetId: string
+  dispatchDate: string
+  dispatcherId: string
+  dryRun?: boolean
+}): Promise<{ data: OrchestrationResult; timestamp: string }> {
+  return requestOperations(`${operationsBaseUrl}/dispatch/orchestrate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      fleet_id: params.fleetId,
+      dispatch_date: params.dispatchDate,
+      dispatcher_id: params.dispatcherId,
+      dry_run: params.dryRun ?? false,
+    }),
+  })
 }
 
 export async function fetchAlerts(): Promise<FleetAlert[]> {

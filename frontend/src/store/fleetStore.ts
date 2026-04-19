@@ -7,6 +7,7 @@ import type {
   SimulationResult,
   GeoJSONFeature,
   Consignment,
+  OrchestrationResult,
   RouteDeviation,
   TelemetryPosition,
   FleetAlert,
@@ -52,8 +53,12 @@ interface FleetState {
   visionByDriver: Record<string, VisionDriverAlert>
   visionHistory: VisionDriverAlert[]
   lastVisionScanAt: string | null
+  orchestrationResult: OrchestrationResult | null
+  isOrchestrating: boolean
   isVisionMonitoring: boolean
 
+  setOrchestrationResult: (result: OrchestrationResult | null) => void
+  setIsOrchestrating: (v: boolean) => void
   setDrivers: (drivers: Driver[], source: 'navpro' | 'mock' | 'insforge') => void
   setConsignments: (consignments: Consignment[]) => void
   setSelectedDriver: (id: string | null) => void
@@ -118,8 +123,12 @@ export const useFleetStore = create<FleetState>((set) => ({
   visionByDriver: {},
   visionHistory: [],
   lastVisionScanAt: null,
+  orchestrationResult: null,
+  isOrchestrating: false,
   isVisionMonitoring: false,
 
+  setOrchestrationResult: (result) => set({ orchestrationResult: result, isOrchestrating: false }),
+  setIsOrchestrating: (v) => set({ isOrchestrating: v }),
   setDrivers: (drivers, source) =>
     set({ drivers, dataSource: source, lastUpdated: new Date(), isLoading: false }),
   setConsignments: (consignments) =>

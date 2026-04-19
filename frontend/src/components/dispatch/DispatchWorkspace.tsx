@@ -6,6 +6,7 @@ import {
   createConsignment,
   deleteConsignment,
   fetchDailyConsignments,
+  orchestrateDailyDispatch,
   updateConsignment,
 } from '../../api/client'
 import { useFleetStore } from '../../store/fleetStore'
@@ -35,6 +36,10 @@ export function DispatchWorkspace() {
   const setIsLoadingConsignments = useFleetStore((state) => state.setIsLoadingConsignments)
   const setIsSavingConsignment = useFleetStore((state) => state.setIsSavingConsignment)
   const setConsignmentError = useFleetStore((state) => state.setConsignmentError)
+  const orchestrationResult = useFleetStore((state) => state.orchestrationResult)
+  const isOrchestrating = useFleetStore((state) => state.isOrchestrating)
+  const setOrchestrationResult = useFleetStore((state) => state.setOrchestrationResult)
+  const setIsOrchestrating = useFleetStore((state) => state.setIsOrchestrating)
   const upsertConsignment = useFleetStore((state) => state.upsertConsignment)
   const removeConsignment = useFleetStore((state) => state.removeConsignment)
 
@@ -126,6 +131,23 @@ export function DispatchWorkspace() {
     }
   }
 
+  async function handleOrchestrate() {
+    setIsOrchestrating(true)
+    setConsignmentError(null)
+    try {
+      const response = await orchestrateDailyDispatch({
+        fleetId: FLEET_ID,
+        dispatchDate: selectedDispatchDate,
+        dispatcherId: 'DISP001',
+      })
+      setOrchestrationResult(response.data)
+      setRefreshKey((current) => current + 1)
+    } catch (error) {
+      setConsignmentError(error instanceof Error ? error.message : 'Auto-dispatch failed')
+      setIsOrchestrating(false)
+    }
+  }
+
   const boardTabClass = (mode: 'board' | 'drivers') =>
     `flex-1 inline-flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
       dispatchMode === mode
@@ -202,6 +224,8 @@ export function DispatchWorkspace() {
               selectedDispatchDate={selectedDispatchDate}
               isLoading={isLoadingConsignments}
               error={consignmentError}
+              orchestrationResult={orchestrationResult}
+              isOrchestrating={isOrchestrating}
               onRefresh={() => setRefreshKey((current) => current + 1)}
               onCreate={() => {
                 setSelectedConsignment('__new__')
@@ -211,6 +235,8 @@ export function DispatchWorkspace() {
                 setSelectedConsignment(consignmentId)
                 setConsignmentError(null)
               }}
+              onOrchestrate={handleOrchestrate}
+              onDismissOrchestration={() => setOrchestrationResult(null)}
             />
           )
         ) : selectedDriverId ? (
