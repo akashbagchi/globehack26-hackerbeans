@@ -6,6 +6,16 @@ const STATUS_CONFIG = {
   driving: { label: 'Driving', color: 'text-green-700 bg-green-50 border border-green-200', dot: 'bg-green-500' },
   idle: { label: 'Idle', color: 'text-yellow-700 bg-yellow-50 border border-yellow-200', dot: 'bg-yellow-500' },
   off_duty: { label: 'Off Duty', color: 'text-[#5f6368] bg-[#f1f3f4] border border-[#dadce0]', dot: 'bg-gray-400' },
+  unavailable: { label: 'Unavailable', color: 'text-orange-700 bg-orange-50 border border-orange-200', dot: 'bg-orange-500' },
+  breakdown: { label: 'Breakdown', color: 'text-red-700 bg-red-50 border border-red-200', dot: 'bg-red-500' },
+}
+
+const READINESS_CONFIG: Record<string, string> = {
+  ready: 'text-green-700 bg-green-50',
+  limited: 'text-yellow-700 bg-yellow-50',
+  at_risk: 'text-orange-700 bg-orange-50',
+  assigned: 'text-blue-700 bg-blue-50',
+  blocked: 'text-red-700 bg-red-50',
 }
 
 const AVATAR_COLORS = [
@@ -22,7 +32,7 @@ export function DriverCard({ driver, index = 0 }: DriverCardProps) {
   const selectedDriverId = useFleetStore((s) => s.selectedDriverId)
   const setSelectedDriver = useFleetStore((s) => s.setSelectedDriver)
   const isSelected = selectedDriverId === driver.driver_id
-  const cfg = STATUS_CONFIG[driver.status]
+  const cfg = STATUS_CONFIG[driver.status] ?? STATUS_CONFIG.unavailable
   const initials = driver.name.split(' ').map((n) => n[0]).join('')
   const avatarBg = AVATAR_COLORS[index % AVATAR_COLORS.length]
 
@@ -52,6 +62,14 @@ export function DriverCard({ driver, index = 0 }: DriverCardProps) {
             <span className="flex items-center gap-1">
               <Clock size={11} />
               {driver.hos.drive_remaining_hrs.toFixed(1)}h HOS
+            </span>
+          </div>
+          <div className="flex items-center gap-2 mt-2 text-[10px]">
+            <span className={`px-2 py-0.5 rounded-full font-semibold ${READINESS_CONFIG[driver.readiness.state] ?? 'text-gray-700 bg-gray-100'}`}>
+              {driver.readiness.state.replace('_', ' ')} · {driver.readiness.score}
+            </span>
+            <span className="text-[#5f6368] truncate">
+              {driver.vehicle.trailer_type.replace('_', ' ')} · {driver.vehicle.capacity_lbs.toLocaleString()} lbs
             </span>
           </div>
         </div>

@@ -7,6 +7,8 @@ const STATUS_COLOR: Record<string, string> = {
   driving: '#10b981',
   idle: '#f59e0b',
   off_duty: '#94a3b8',
+  unavailable: '#f97316',
+  breakdown: '#ef4444',
 }
 
 interface TruckMarkersProps {

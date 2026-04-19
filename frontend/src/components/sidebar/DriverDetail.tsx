@@ -9,6 +9,16 @@ const STATUS_CONFIG = {
   driving: { label: 'Driving', color: 'text-green-700 bg-green-50 border border-green-200' },
   idle: { label: 'Idle', color: 'text-yellow-700 bg-yellow-50 border border-yellow-200' },
   off_duty: { label: 'Off Duty', color: 'text-[#5f6368] bg-[#f1f3f4] border border-[#dadce0]' },
+  unavailable: { label: 'Unavailable', color: 'text-orange-700 bg-orange-50 border border-orange-200' },
+  breakdown: { label: 'Breakdown', color: 'text-red-700 bg-red-50 border border-red-200' },
+}
+
+const READINESS_CONFIG: Record<string, string> = {
+  ready: 'text-green-700 bg-green-50 border border-green-200',
+  limited: 'text-yellow-700 bg-yellow-50 border border-yellow-200',
+  at_risk: 'text-orange-700 bg-orange-50 border border-orange-200',
+  assigned: 'text-blue-700 bg-blue-50 border border-blue-200',
+  blocked: 'text-red-700 bg-red-50 border border-red-200',
 }
 
 const AVATAR_COLORS = [
@@ -37,9 +47,11 @@ export function DriverDetail() {
   const driver = drivers[driverIndex]
   if (!driver) return null
 
-  const cfg = STATUS_CONFIG[driver.status]
+  const cfg = STATUS_CONFIG[driver.status] ?? STATUS_CONFIG.unavailable
   const avatarBg = AVATAR_COLORS[driverIndex % AVATAR_COLORS.length]
   const initials = driver.name.split(' ').map((n) => n[0]).join('')
+  const readinessStyle = READINESS_CONFIG[driver.readiness.state] ?? 'text-gray-700 bg-gray-50 border border-gray-200'
+  const certifications = [...new Set([...(driver.certifications ?? []), ...(driver.endorsements ?? [])])]
 
   async function handleDispatch(e: React.FormEvent) {
     e.preventDefault()
@@ -109,6 +121,40 @@ export function DriverDetail() {
             </div>
 
             <div>
+              <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Readiness</div>
+              <div className="space-y-2">
+                <div className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${readinessStyle}`}>
+                  {driver.readiness.state.replace('_', ' ')} · score {driver.readiness.score}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
+                    <div className="text-[#5f6368]">Available Window</div>
+                    <div className="font-medium text-[#202124]">
+                      {new Date(driver.availability_window.available_from).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                      {' - '}
+                      {new Date(driver.availability_window.available_until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                    </div>
+                  </div>
+                  <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
+                    <div className="text-[#5f6368]">Next Available</div>
+                    <div className="font-medium text-[#202124]">
+                      {driver.readiness.available_at ? new Date(driver.readiness.available_at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Now'}
+                    </div>
+                  </div>
+                </div>
+                {driver.readiness.blocker_reasons.length > 0 && (
+                  <div className="space-y-1">
+                    {driver.readiness.blocker_reasons.map((reason) => (
+                      <div key={reason} className="text-[11px] text-[#5f6368] bg-[#f8f9fa] border border-[#dadce0] rounded px-2 py-1">
+                        {reason}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
               <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Hours of Service</div>
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -128,11 +174,51 @@ export function DriverDetail() {
 
             <div>
               <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Truck</div>
-              <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-xs">
+              <div className="grid grid-cols-3 gap-x-4 gap-y-2 text-xs">
                 <div><span className="text-[#5f6368]">Fuel</span><div className="font-medium text-[#202124]">{driver.vehicle.fuel_level_pct}%</div></div>
                 <div><span className="text-[#5f6368]">MPG</span><div className="font-medium text-[#202124]">{driver.vehicle.mpg_avg}</div></div>
                 <div><span className="text-[#5f6368]">$/mi</span><div className="font-medium text-[#202124]">${driver.economics.cost_per_mile}</div></div>
+                <div><span className="text-[#5f6368]">Capacity</span><div className="font-medium text-[#202124]">{driver.vehicle.capacity_lbs.toLocaleString()} lbs</div></div>
+                <div><span className="text-[#5f6368]">Trailer</span><div className="font-medium text-[#202124]">{driver.vehicle.trailer_type.replace('_', ' ')}</div></div>
+                <div><span className="text-[#5f6368]">Cab</span><div className="font-medium text-[#202124]">{driver.vehicle.cab_type.replace('_', ' ')}</div></div>
               </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                <span className={`text-[10px] px-2 py-1 rounded-full ${driver.vehicle.refrigerated ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {driver.vehicle.refrigerated ? 'Reefer Ready' : 'Dry Equipment'}
+                </span>
+                <span className={`text-[10px] px-2 py-1 rounded-full ${driver.vehicle.hazmat_permitted ? 'bg-purple-50 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {driver.vehicle.hazmat_permitted ? 'Hazmat Permitted' : 'No Hazmat'}
+                </span>
+                <span className={`text-[10px] px-2 py-1 rounded-full ${driver.vehicle.maintenance_ready ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  {driver.vehicle.maintenance_ready ? 'Maintenance Ready' : 'Maintenance Hold'}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Qualifications</div>
+              <div className="flex flex-wrap gap-2">
+                {certifications.map((cert) => (
+                  <span key={cert} className="text-[10px] px-2 py-1 rounded-full bg-[#e8f0fe] text-[#1a73e8]">
+                    {cert.replace(/_/g, ' ')}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
+                  <div className="text-[#5f6368]">Max Deadhead</div>
+                  <div className="font-medium text-[#202124]">{driver.contract_constraints.max_deadhead_miles} mi</div>
+                </div>
+                <div className="bg-[#f8f9fa] border border-[#dadce0] rounded p-2">
+                  <div className="text-[#5f6368]">Preferred Regions</div>
+                  <div className="font-medium text-[#202124]">{driver.contract_constraints.preferred_regions.join(', ')}</div>
+                </div>
+              </div>
+              {driver.contract_constraints.excluded_cargo_types.length > 0 && (
+                <div className="mt-2 text-[11px] text-[#5f6368]">
+                  Excludes: {driver.contract_constraints.excluded_cargo_types.join(', ')}
+                </div>
+              )}
             </div>
 
             {driver.current_load && (

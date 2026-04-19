@@ -64,9 +64,11 @@ function buildFleetSummary(drivers: Driver[]): string {
     const loadInfo = d.current_load
       ? `en route ${d.current_load.origin}→${d.current_load.destination}`
       : 'no load'
+    const certs = [...new Set([...(d.certifications ?? []), ...(d.endorsements ?? [])])].join(', ') || 'standard'
     return `- ${d.name} (${d.driver_id}): ${d.status}, ${d.location.city} ${d.location.state}, ` +
       `HOS ${d.hos.drive_remaining_hrs}h remain, fuel ${d.vehicle.fuel_level_pct}%, ` +
-      `$${d.economics.cost_per_mile}/mi, ${loadInfo}`
+      `$${d.economics.cost_per_mile}/mi, readiness ${d.readiness.state} (${d.readiness.score}), ` +
+      `capacity ${d.vehicle.capacity_lbs} lbs, certs [${certs}], ${loadInfo}`
   }).join('\n')
 }
 

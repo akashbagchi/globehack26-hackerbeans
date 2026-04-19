@@ -3,6 +3,9 @@ from datetime import datetime, timezone
 from app.models.load import LoadRequest
 from app.services.navpro import get_drivers
 from app.services.claude import get_dispatch_recommendations, get_cost_insights
+from app.services.eligibility import evaluate_driver_for_load
+from app.models.events import AssignmentDecisionEvent, AssignmentDecisionPayload
+from app.services.event_bus import event_bus
 from app.limiter import limiter
 
 router = APIRouter(prefix="/dispatch", tags=["dispatch"])
@@ -12,8 +15,41 @@ router = APIRouter(prefix="/dispatch", tags=["dispatch"])
 @limiter.limit("10/minute")
 async def recommend_dispatch(request: Request, req: LoadRequest):
     drivers, source = await get_drivers()
+    evaluations = [
+        evaluate_driver_for_load(driver, req.pickup, req.destination, req.cargo, req.weight_lbs)
+        for driver in drivers
+    ]
+    eligible_drivers = [evaluation.driver for evaluation in evaluations if evaluation.eligible]
+    await event_bus.publish(
+        AssignmentDecisionEvent(
+            producer="dispatch.recommend",
+            payload=AssignmentDecisionPayload(
+                pickup=req.pickup,
+                destination=req.destination,
+                cargo=req.cargo,
+                weight_lbs=req.weight_lbs,
+                eligible_driver_ids=[driver.driver_id for driver in eligible_drivers],
+                rejected_driver_ids=[
+                    evaluation.driver.driver_id
+                    for evaluation in evaluations
+                    if not evaluation.eligible
+                ],
+            ),
+        )
+    )
+
+    if not eligible_drivers:
+        return {
+            "data": {
+                "recommendations": [],
+                "dispatch_note": "No eligible driver-truck pairs met the readiness, HOS, certification, and capacity checks.",
+            },
+            "source": source,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
     result = await get_dispatch_recommendations(
-        drivers, req.pickup, req.destination, req.cargo, req.weight_lbs
+        eligible_drivers, req.pickup, req.destination, req.cargo, req.weight_lbs
     )
     return {
         "data": result,

@@ -48,6 +48,8 @@ export function DriverSidebar() {
             <option value="driving">Driving</option>
             <option value="idle">Idle</option>
             <option value="off_duty">Off Duty</option>
+            <option value="unavailable">Unavailable</option>
+            <option value="breakdown">Breakdown</option>
           </select>
         </div>
       </div>
