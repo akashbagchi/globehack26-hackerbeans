@@ -25,3 +25,7 @@ frontend/dist-ssr/
 .vscode/
 .idea/
 *.sw?
+
+# Claude
+**/.claude/
+**/CLAUDE.md
