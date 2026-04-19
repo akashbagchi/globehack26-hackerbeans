@@ -13,6 +13,8 @@ import type {
   RouteDeviation,
   GeoJSONFeature,
   FleetAlert,
+  VisionDriverAlert,
+  VisionMonitorFrame,
 } from '../types'
 
 export function getToken(): string | null {
@@ -322,6 +324,14 @@ export async function fetchTelemetryDeviations(): Promise<RouteDeviation[]> {
   const { data, error } = await insforge.database.from('route_deviations').select()
   if (error) throw new Error(String(error))
   return (data ?? []) as unknown as RouteDeviation[]
+}
+
+export async function runVisionMonitor(payload: {
+  frames: VisionMonitorFrame[]
+}): Promise<{ alerts: VisionDriverAlert[] }> {
+  const { data, error } = await insforge.functions.invoke('vision-monitor', { body: payload })
+  if (error) throw new Error(String(error))
+  return data.data
 }
 
 type RouteRow = {

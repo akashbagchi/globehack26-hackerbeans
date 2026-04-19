@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { ArrowLeft, MapPin, Truck, Zap } from 'lucide-react'
+import { ArrowLeft, MapPin, Truck, Zap, Camera, AlertTriangle } from 'lucide-react'
 import { useFleetStore } from '../../store/fleetStore'
 import { fetchDispatchRecommendations } from '../../api/client'
 import { DriverMatch } from '../dispatch/DriverMatch'
 import { SimulateButton } from '../dispatch/SimulateButton'
+import { getVisionFeedAssignments } from '../../lib/visionFeeds'
+import { VisionVideoPlayer } from '../vision/VisionVideoPlayer'
 
 const STATUS_CONFIG = {
   driving: { label: 'Driving', color: 'text-green-700 bg-green-50 border border-green-200' },
@@ -36,6 +38,7 @@ export function DriverDetail() {
   const isDispatching = useFleetStore((s) => s.isDispatching)
   const setIsDispatching = useFleetStore((s) => s.setIsDispatching)
   const setDispatchRecommendations = useFleetStore((s) => s.setDispatchRecommendations)
+  const visionByDriver = useFleetStore((s) => s.visionByDriver)
 
   const [pickup, setPickup] = useState('')
   const [destination, setDestination] = useState('')
@@ -48,6 +51,8 @@ export function DriverDetail() {
   if (!driver) return null
 
   const cfg = STATUS_CONFIG[driver.status] ?? STATUS_CONFIG.unavailable
+  const visionFeedUrl = getVisionFeedAssignments(drivers)[driver.driver_id] ?? null
+  const visionAlert = visionByDriver[driver.driver_id] ?? null
   const avatarBg = AVATAR_COLORS[driverIndex % AVATAR_COLORS.length]
   const initials = driver.name.split(' ').map((n) => n[0]).join('')
   const readiness = driver.readiness ?? { state: 'unknown', score: 0, blocker_reasons: [], available_at: null }
@@ -128,6 +133,49 @@ export function DriverDetail() {
       <div className="flex-1 overflow-y-auto">
         {tab === 'details' && (
           <div className="p-4 space-y-4">
+            {visionFeedUrl && (
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="text-xs font-medium uppercase tracking-wide text-[#5f6368]">SAURON Vision</div>
+                  {visionAlert && (
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase ${
+                      visionAlert.status === 'critical'
+                        ? 'bg-red-100 text-red-700'
+                        : visionAlert.status === 'watch'
+                          ? 'bg-orange-100 text-orange-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                      {visionAlert.status} · {visionAlert.attention_score}
+                    </span>
+                  )}
+                </div>
+                <div className="overflow-hidden rounded-2xl border border-[#dadce0] bg-[#0f172a]">
+                  <VisionVideoPlayer
+                    src={visionFeedUrl}
+                    className="aspect-video w-full"
+                    controls
+                  />
+                  <div className="flex items-start justify-between gap-3 border-t border-white/10 bg-[#111827] px-4 py-3 text-white">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.14em] text-slate-300">
+                        <Camera size={12} />
+                        Active feed
+                      </div>
+                      <p className="mt-1 text-sm text-slate-100">
+                        {visionAlert?.summary ?? 'SAURON is monitoring this truck in the background.'}
+                      </p>
+                    </div>
+                    {visionAlert?.primary_issue && (
+                      <div className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase text-white">
+                        <AlertTriangle size={10} />
+                        {visionAlert.primary_issue.replace(/_/g, ' ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div>
               <div className="text-xs font-medium text-[#5f6368] uppercase tracking-wide mb-2">Location</div>
               <div className="flex items-center gap-2 text-sm text-[#202124]">
