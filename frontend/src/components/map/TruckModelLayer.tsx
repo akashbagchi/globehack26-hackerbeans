@@ -14,10 +14,11 @@ interface TruckModelLayerProps {
 const LAYER_ID = '3d-trucks'
 
 /**
- * How many real-world meters the truck model should span on the map.
- * Exaggerated so trucks are visible at regional zoom levels.
+ * Constant screen size in pixels for truck models up to TRUCK_ZOOM_FLOOR.
+ * Above that zoom level the scale is held fixed and the camera simply zooms in.
  */
-const TRUCK_DISPLAY_METERS = 15000
+const TRUCK_PIXEL_SIZE = 50
+const TRUCK_ZOOM_FLOOR = 14
 
 // --- Loaders (singleton) ---
 const dracoLoader = new DRACOLoader()
@@ -36,23 +37,38 @@ function loadModel(url: string): Promise<THREE.Group> {
     gltfLoader.load(
       url,
       (gltf) => {
-        // Normalize so longest axis = 1 unit, centered at origin
-        const box = new THREE.Box3().setFromObject(gltf.scene)
+        const root = gltf.scene
+
+        // Step 1: scale so longest axis = 1 unit
+        const box1 = new THREE.Box3().setFromObject(root)
         const size = new THREE.Vector3()
-        box.getSize(size)
+        box1.getSize(size)
         const maxDim = Math.max(size.x, size.y, size.z)
-        if (maxDim > 0) gltf.scene.scale.multiplyScalar(1 / maxDim)
+        if (maxDim > 0) root.scale.multiplyScalar(1 / maxDim)
 
+        // Step 2: recompute bbox *after* scale is applied, then center XY
+        // and lift so the bounding-box bottom sits exactly at z=0 (wheels on ground)
+        const box2 = new THREE.Box3().setFromObject(root)
         const center = new THREE.Vector3()
-        box.getCenter(center).multiplyScalar(1 / maxDim)
-        gltf.scene.position.sub(center)
+        box2.getCenter(center)
+        root.position.x -= center.x
+        root.position.y -= center.y
+        root.position.z -= box2.min.z
 
-        // Shift up so the bottom (wheels) sits on the ground plane
-        const normBox = new THREE.Box3().setFromObject(gltf.scene)
-        gltf.scene.position.z -= normBox.min.z
+        // Disable depth testing so trucks always render on top of the map surface.
+        // Without this, at high zoom the tile z-buffer beats trucks at z=0 Mercator.
+        root.traverse((obj) => {
+          if (obj instanceof THREE.Mesh) {
+            const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
+            mats.forEach((m) => {
+              m.depthTest = false
+              m.depthWrite = false
+            })
+          }
+        })
 
-        glbCache.set(url, gltf.scene)
-        resolve(gltf.scene.clone())
+        glbCache.set(url, root)
+        resolve(root.clone())
       },
       undefined,
       reject,
@@ -76,12 +92,10 @@ export function TruckModelLayer({ map }: TruckModelLayerProps) {
       [driver.location.lng, driver.location.lat],
       0,
     )
-    const s = mc.meterInMercatorCoordinateUnits() * TRUCK_DISPLAY_METERS
-
     group.position.set(mc.x, mc.y, mc.z ?? 0)
-    group.scale.set(s, s, s)
     // Heading: degrees clockwise from north → radians counter-clockwise around Z
     group.rotation.z = -(driver.location.heading * Math.PI) / 180
+    // Scale is updated every frame in render() for constant screen size
   }
 
   // Set up Three.js custom layer
@@ -115,6 +129,15 @@ export function TruckModelLayer({ map }: TruckModelLayerProps) {
 
       render(_gl, matrix) {
         if (!rendererRef.current || !sceneRef.current || !cameraRef.current) return
+
+        // Constant screen size up to TRUCK_ZOOM_FLOOR; above that, hold the
+        // Mercator scale fixed so the camera simply zooms into the model.
+        const effectiveZoom = Math.min(map.getZoom(), TRUCK_ZOOM_FLOOR)
+        const s = TRUCK_PIXEL_SIZE / (512 * Math.pow(2, effectiveZoom))
+        for (const group of trucksRef.current.values()) {
+          group.scale.setScalar(s)
+        }
+
         cameraRef.current.projectionMatrix = new THREE.Matrix4().fromArray(
           matrix as unknown as number[],
         )
@@ -167,6 +190,9 @@ export function TruckModelLayer({ map }: TruckModelLayerProps) {
         const url = truckModelUrl(spec)
         loadModel(url).then((model) => {
           if (!sceneRef.current) return
+          // Another promise (from a re-render) may have already added this driver.
+          // If so, discard this result to prevent orphaned giant wrappers.
+          if (trucksRef.current.has(driver.driver_id)) return
           const wrapper = new THREE.Group()
           wrapper.add(model)
           placeTruck(wrapper, driver)
