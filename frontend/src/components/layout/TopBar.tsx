@@ -1,6 +1,7 @@
-import { Map, BarChart2, Pin, MessageSquare, LayoutGrid } from 'lucide-react'
+import { Map, BarChart2, Pin, MessageSquare, LayoutGrid, LogOut } from 'lucide-react'
 import { useFleetStore } from '../../store/fleetStore'
 import { useUIStore } from '../../store/uiStore'
+import { useAuthStore } from '../../store/authStore'
 
 const NAV_TABS = [
   { id: 'dispatch' as const, icon: Map, label: 'Map' },
@@ -12,7 +13,10 @@ export function TopBar() {
   const dataSource = useFleetStore((s) => s.dataSource)
   const activePanel = useUIStore((s) => s.activePanel)
   const setActivePanel = useUIStore((s) => s.setActivePanel)
+  const dispatcher = useAuthStore((s) => s.dispatcher)
+  const clearAuth = useAuthStore((s) => s.clearAuth)
   const activeCount = drivers.filter((d) => d.status === 'driving').length
+  const initials = dispatcher?.name.split(' ').map((n) => n[0]).join('') ?? 'D'
 
   return (
     <div className="h-14 bg-white border-b border-[#dadce0] flex items-stretch px-4 shrink-0 z-10">
@@ -66,9 +70,19 @@ export function TopBar() {
             <Icon size={18} />
           </button>
         ))}
+        {dispatcher && (
+          <span className="text-xs text-[#5f6368] ml-1 hidden sm:block">{dispatcher.name}</span>
+        )}
         <div className="w-8 h-8 rounded-full bg-[#1a73e8] flex items-center justify-center text-white text-xs font-bold ml-1">
-          HA
+          {initials}
         </div>
+        <button
+          onClick={clearAuth}
+          title="Sign out"
+          className="w-9 h-9 flex items-center justify-center rounded-full text-[#5f6368] hover:bg-[#f1f3f4] hover:text-red-500 transition-colors"
+        >
+          <LogOut size={16} />
+        </button>
       </div>
     </div>
   )
