@@ -1,11 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, time, timezone
 from typing import Any
+from uuid import uuid4
 
 import httpx
 
 from app.config import settings
+from app.models.domain import (
+    ConsignmentCreate,
+    ConsignmentStatus,
+    ConsignmentUpdate,
+    can_transition_consignment_status,
+)
 
 
 class OperationsServiceError(Exception):
@@ -13,6 +20,10 @@ class OperationsServiceError(Exception):
 
 
 class OperationsServiceNotConfigured(OperationsServiceError):
+    pass
+
+
+class OperationsServiceConflict(OperationsServiceError):
     pass
 
 
@@ -57,6 +68,14 @@ def _within_range(
     return True
 
 
+def _consignment_dispatch_timestamp(row: dict[str, Any]) -> str | None:
+    return (
+        row.get("pickup_window_start_at")
+        or row.get("requested_pickup_at")
+        or row.get("created_at")
+    )
+
+
 async def _fetch_records(table_name: str, params: dict[str, str]) -> list[dict[str, Any]]:
     async with httpx.AsyncClient(timeout=15) as client:
         response = await client.get(
@@ -78,15 +97,70 @@ async def _fetch_records(table_name: str, params: dict[str, str]) -> list[dict[s
     return payload
 
 
+async def _mutate_records(
+    method: str,
+    table_name: str,
+    *,
+    params: dict[str, str] | None = None,
+    json_body: Any = None,
+) -> Any:
+    headers = {
+        **_base_headers(),
+        "Prefer": "return=representation",
+    }
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.request(
+            method,
+            _records_url(table_name),
+            headers=headers,
+            params=params,
+            json=json_body,
+        )
+
+    if response.status_code >= 400:
+        raise OperationsServiceError(
+            f"InsForge {method} failed for {table_name}: {response.status_code} {response.text}"
+        )
+
+    if response.status_code == 204 or not response.text.strip():
+        return None
+
+    return response.json()
+
+
+def _generate_consignment_id() -> str:
+    return f"CON{uuid4().hex[:8].upper()}"
+
+
+def _flatten_consignment_payload(payload: ConsignmentCreate | ConsignmentUpdate) -> dict[str, Any]:
+    values = payload.model_dump(exclude_none=True, mode="json")
+    pickup_window = values.pop("pickup_window", None)
+    delivery_window = values.pop("delivery_window", None)
+
+    if pickup_window:
+        values["pickup_window_start_at"] = pickup_window["start_at"]
+        values["pickup_window_end_at"] = pickup_window["end_at"]
+    if delivery_window:
+        values["delivery_window_start_at"] = delivery_window["start_at"]
+        values["delivery_window_end_at"] = delivery_window["end_at"]
+
+    return values
+
+
 async def list_consignments(
     fleet_id: str,
     from_ts: datetime | None = None,
     to_ts: datetime | None = None,
+    dispatch_date: date | None = None,
     status: str | None = None,
 ) -> list[dict[str, Any]]:
+    if dispatch_date:
+        from_ts = from_ts or datetime.combine(dispatch_date, time.min, tzinfo=timezone.utc)
+        to_ts = to_ts or datetime.combine(dispatch_date, time.max, tzinfo=timezone.utc)
+
     params: dict[str, str] = {
         "fleet_id": f"eq.{fleet_id}",
-        "order": "requested_pickup_at.desc",
+        "order": "pickup_window_start_at.asc",
     }
     if status:
         params["status"] = f"eq.{status}"
@@ -95,9 +169,99 @@ async def list_consignments(
         rows = [
             row
             for row in rows
-            if _within_range(row.get("requested_pickup_at"), from_ts, to_ts)
+            if _within_range(_consignment_dispatch_timestamp(row), from_ts, to_ts)
         ]
     return rows
+
+
+async def get_consignment(
+    fleet_id: str,
+    consignment_id: str,
+) -> dict[str, Any] | None:
+    rows = await _fetch_records(
+        "consignments",
+        {
+            "fleet_id": f"eq.{fleet_id}",
+            "consignment_id": f"eq.{consignment_id}",
+            "limit": "1",
+        },
+    )
+    return rows[0] if rows else None
+
+
+async def create_consignment(payload: ConsignmentCreate) -> dict[str, Any]:
+    values = _flatten_consignment_payload(payload)
+    values["consignment_id"] = payload.consignment_id or _generate_consignment_id()
+    values["status"] = payload.status.value
+    created = await _mutate_records("POST", "consignments", json_body=[values])
+    if isinstance(created, list) and created:
+        return created[0]
+    created_row = await get_consignment(payload.fleet_id, values["consignment_id"])
+    if not created_row:
+        raise OperationsServiceError("Consignment was created but could not be reloaded")
+    return created_row
+
+
+async def update_consignment(
+    fleet_id: str,
+    consignment_id: str,
+    payload: ConsignmentUpdate,
+) -> dict[str, Any] | None:
+    existing = await get_consignment(fleet_id=fleet_id, consignment_id=consignment_id)
+    if not existing:
+        return None
+
+    values = _flatten_consignment_payload(payload)
+    next_status = values.get("status")
+    current_status = existing.get("status")
+    if next_status and current_status and next_status != current_status:
+        if not can_transition_consignment_status(
+            ConsignmentStatus(current_status),
+            ConsignmentStatus(next_status),
+        ):
+            raise OperationsServiceConflict(
+                f"Cannot transition consignment from {current_status} to {next_status}"
+            )
+
+    if not values:
+        return existing
+
+    updated = await _mutate_records(
+        "PATCH",
+        "consignments",
+        params={
+            "fleet_id": f"eq.{fleet_id}",
+            "consignment_id": f"eq.{consignment_id}",
+        },
+        json_body=values,
+    )
+    if isinstance(updated, list) and updated:
+        return updated[0]
+    return await get_consignment(fleet_id=fleet_id, consignment_id=consignment_id)
+
+
+async def delete_consignment(
+    fleet_id: str,
+    consignment_id: str,
+) -> bool:
+    existing = await get_consignment(fleet_id=fleet_id, consignment_id=consignment_id)
+    if not existing:
+        return False
+
+    if existing.get("current_assignment_id"):
+        raise OperationsServiceConflict(
+            "Cannot delete a consignment that has a current assignment"
+        )
+
+    await _mutate_records(
+        "DELETE",
+        "consignments",
+        params={
+            "fleet_id": f"eq.{fleet_id}",
+            "consignment_id": f"eq.{consignment_id}",
+        },
+    )
+    return True
 
 
 async def list_assignments(

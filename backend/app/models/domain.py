@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class DriverStatus(str, Enum):
@@ -52,6 +52,14 @@ class NotificationChannel(str, Enum):
     sms = "sms"
     phone = "phone"
     portal = "portal"
+
+
+class CargoClass(str, Enum):
+    general = "general"
+    hazmat = "hazmat"
+    refrigerated = "refrigerated"
+    oversized = "oversized"
+    high_value = "high_value"
 
 
 class ReconciliationStatus(str, Enum):
@@ -144,6 +152,81 @@ class GeoPoint(BaseModel):
     state: Optional[str] = None
 
 
+class TimeWindow(BaseModel):
+    start_at: datetime
+    end_at: datetime
+
+
+class ReceiverContactPreference(BaseModel):
+    channel: NotificationChannel
+    recipient: str
+    priority: int = Field(default=1, ge=1, le=5)
+    notes: Optional[str] = None
+
+
+class ConsignmentRequirementFields(BaseModel):
+    customer_reference: Optional[str] = None
+    shipper_name: str
+    receiver_name: str
+    origin: str
+    destination: str
+    cargo_description: str
+    cargo_class: CargoClass = CargoClass.general
+    weight_lbs: int = Field(..., gt=0)
+    pickup_window: Optional[TimeWindow] = None
+    delivery_window: Optional[TimeWindow] = None
+    special_handling: list[str] = Field(default_factory=list)
+    receiver_contact_preferences: list[ReceiverContactPreference] = Field(default_factory=list)
+    requested_pickup_at: Optional[datetime] = None
+    promised_delivery_at: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def validate_time_windows(self) -> "ConsignmentRequirementFields":
+        if self.pickup_window and self.pickup_window.end_at < self.pickup_window.start_at:
+            raise ValueError("pickup_window.end_at must be on or after pickup_window.start_at")
+        if self.delivery_window and self.delivery_window.end_at < self.delivery_window.start_at:
+            raise ValueError("delivery_window.end_at must be on or after delivery_window.start_at")
+        return self
+
+
+class ConsignmentCreate(ConsignmentRequirementFields):
+    fleet_id: str
+    consignment_id: Optional[str] = None
+    status: ConsignmentStatus = ConsignmentStatus.unassigned
+    assigned_driver_id: Optional[str] = None
+    assigned_truck_id: Optional[str] = None
+    current_assignment_id: Optional[str] = None
+
+
+class ConsignmentUpdate(BaseModel):
+    customer_reference: Optional[str] = None
+    shipper_name: Optional[str] = None
+    receiver_name: Optional[str] = None
+    origin: Optional[str] = None
+    destination: Optional[str] = None
+    cargo_description: Optional[str] = None
+    cargo_class: Optional[CargoClass] = None
+    weight_lbs: Optional[int] = Field(default=None, gt=0)
+    pickup_window: Optional[TimeWindow] = None
+    delivery_window: Optional[TimeWindow] = None
+    special_handling: Optional[list[str]] = None
+    receiver_contact_preferences: Optional[list[ReceiverContactPreference]] = None
+    requested_pickup_at: Optional[datetime] = None
+    promised_delivery_at: Optional[datetime] = None
+    status: Optional[ConsignmentStatus] = None
+    assigned_driver_id: Optional[str] = None
+    assigned_truck_id: Optional[str] = None
+    current_assignment_id: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_time_windows(self) -> "ConsignmentUpdate":
+        if self.pickup_window and self.pickup_window.end_at < self.pickup_window.start_at:
+            raise ValueError("pickup_window.end_at must be on or after pickup_window.start_at")
+        if self.delivery_window and self.delivery_window.end_at < self.delivery_window.start_at:
+            raise ValueError("delivery_window.end_at must be on or after delivery_window.start_at")
+        return self
+
+
 class DispatcherProfile(AuditFields):
     dispatcher_id: str
     name: str
@@ -201,7 +284,12 @@ class Consignment(BaseModel):
     origin: str
     destination: str
     cargo_description: str
+    cargo_class: CargoClass = CargoClass.general
     weight_lbs: int
+    pickup_window: Optional[TimeWindow] = None
+    delivery_window: Optional[TimeWindow] = None
+    special_handling: list[str] = Field(default_factory=list)
+    receiver_contact_preferences: list[ReceiverContactPreference] = Field(default_factory=list)
     status: ConsignmentStatus
     requested_pickup_at: Optional[datetime] = None
     promised_delivery_at: Optional[datetime] = None

@@ -114,6 +114,86 @@ export interface ChatMessage {
   content: string
 }
 
+export type ConsignmentStatus =
+  | 'unassigned'
+  | 'assigned'
+  | 'dispatched'
+  | 'in_transit'
+  | 'delayed'
+  | 'delivered'
+  | 'exception'
+
+export type CargoClass =
+  | 'general'
+  | 'hazmat'
+  | 'refrigerated'
+  | 'oversized'
+  | 'high_value'
+
+export type NotificationChannel = 'email' | 'sms' | 'phone' | 'portal'
+
+export interface ConsignmentContactPreference {
+  channel: NotificationChannel
+  recipient: string
+  priority: number
+  notes?: string | null
+}
+
+export interface ConsignmentTimeWindow {
+  start_at: string
+  end_at: string
+}
+
+export interface Consignment {
+  consignment_id: string
+  fleet_id: string
+  customer_reference: string | null
+  shipper_name: string
+  receiver_name: string
+  origin: string
+  destination: string
+  cargo_description: string
+  cargo_class: CargoClass
+  weight_lbs: number
+  status: ConsignmentStatus
+  requested_pickup_at: string | null
+  promised_delivery_at: string | null
+  assigned_driver_id: string | null
+  assigned_truck_id: string | null
+  current_assignment_id: string | null
+  created_at: string
+  updated_at: string
+  pickup_window_start_at: string | null
+  pickup_window_end_at: string | null
+  delivery_window_start_at: string | null
+  delivery_window_end_at: string | null
+  special_handling: string[]
+  receiver_contact_preferences: ConsignmentContactPreference[]
+}
+
+export interface ConsignmentPayload {
+  fleet_id: string
+  consignment_id?: string
+  customer_reference?: string | null
+  shipper_name: string
+  receiver_name: string
+  origin: string
+  destination: string
+  cargo_description: string
+  cargo_class: CargoClass
+  weight_lbs: number
+  status?: ConsignmentStatus
+  requested_pickup_at?: string | null
+  promised_delivery_at?: string | null
+  assigned_driver_id?: string | null
+  assigned_truck_id?: string | null
+  current_assignment_id?: string | null
+  pickup_window?: ConsignmentTimeWindow | null
+  delivery_window?: ConsignmentTimeWindow | null
+  special_handling: string[]
+  receiver_contact_preferences: ConsignmentContactPreference[]
+}
+
 export interface SimulationResult {
   driver_id: string
   driver_name: string

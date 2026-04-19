@@ -20,6 +20,7 @@ frontend/dist-ssr/
 frontend/.next/
 frontend/out/
 frontend/tsconfig.tsbuildinfo
+**/.pnpm-store
 
 # macOS
 .DS_Store

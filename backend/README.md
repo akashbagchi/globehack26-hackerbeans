@@ -62,6 +62,14 @@ curl.exe "http://localhost:8000/operations/consignments?fleet_id=fleet_demo"
 curl.exe "http://localhost:8000/operations/consignments/CON001/events?fleet_id=fleet_demo"
 ```
 
+Consignment management is also available locally:
+
+```bash
+curl.exe -X POST "http://localhost:8000/operations/consignments" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"fleet_id\":\"fleet_demo\",\"shipper_name\":\"Test Shipper\",\"receiver_name\":\"Test Receiver\",\"origin\":\"Phoenix, AZ\",\"destination\":\"Las Vegas, NV\",\"cargo_description\":\"Medical Supplies\",\"weight_lbs\":12000}"
+```
+
 On Windows PowerShell, prefer `curl.exe` or `Invoke-RestMethod` instead of plain `curl` to avoid the `Invoke-WebRequest` wrapper output.
 
 ## Automated Tests
