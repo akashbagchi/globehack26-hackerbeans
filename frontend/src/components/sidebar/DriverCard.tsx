@@ -3,14 +3,14 @@ import { useFleetStore } from '../../store/fleetStore'
 import type { Driver } from '../../types'
 
 const STATUS_CONFIG = {
-  driving: { label: 'Driving', color: 'bg-green-100 text-green-700', dot: 'bg-green-500' },
-  idle: { label: 'Idle', color: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500' },
-  off_duty: { label: 'Off Duty', color: 'bg-gray-100 text-gray-500', dot: 'bg-gray-400' },
+  driving: { label: 'Driving', color: 'text-green-700 bg-green-50 border border-green-200', dot: 'bg-green-500' },
+  idle: { label: 'Idle', color: 'text-yellow-700 bg-yellow-50 border border-yellow-200', dot: 'bg-yellow-500' },
+  off_duty: { label: 'Off Duty', color: 'text-[#5f6368] bg-[#f1f3f4] border border-[#dadce0]', dot: 'bg-gray-400' },
 }
 
 const AVATAR_COLORS = [
-  'bg-blue-500', 'bg-purple-500', 'bg-green-500',
-  'bg-orange-500', 'bg-pink-500', 'bg-teal-500', 'bg-red-500', 'bg-indigo-500',
+  'bg-[#1a73e8]', 'bg-purple-500', 'bg-green-600',
+  'bg-orange-500', 'bg-pink-500', 'bg-teal-600', 'bg-red-500', 'bg-indigo-500',
 ]
 
 interface DriverCardProps {
@@ -29,28 +29,28 @@ export function DriverCard({ driver, index = 0 }: DriverCardProps) {
   return (
     <div
       onClick={() => setSelectedDriver(isSelected ? null : driver.driver_id)}
-      className={`px-4 py-3 border-b border-gray-50 cursor-pointer transition-colors ${
-        isSelected ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-50'
+      className={`px-4 py-3 border-b border-[#f1f3f4] cursor-pointer transition-colors ${
+        isSelected ? 'bg-[#e8f0fe] border-l-2 border-l-[#1a73e8]' : 'hover:bg-[#f8f9fa]'
       }`}
     >
       <div className="flex items-center gap-3">
-        <div className={`w-8 h-8 rounded-full ${avatarBg} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+        <div className={`w-9 h-9 rounded-full ${avatarBg} flex items-center justify-center text-white text-xs font-semibold shrink-0`}>
           {initials}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-gray-800 truncate">{driver.name}</span>
-            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${cfg.color}`}>
+            <span className="text-sm font-medium text-[#202124] truncate">{driver.name}</span>
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${cfg.color}`}>
               {cfg.label}
             </span>
           </div>
-          <div className="flex items-center gap-3 mt-0.5 text-[11px] text-gray-400">
+          <div className="flex items-center gap-3 mt-0.5 text-xs text-[#5f6368]">
             <span className="flex items-center gap-1">
-              <MapPin size={10} />
+              <MapPin size={11} />
               {driver.location.city}, {driver.location.state}
             </span>
             <span className="flex items-center gap-1">
-              <Clock size={10} />
+              <Clock size={11} />
               {driver.hos.drive_remaining_hrs.toFixed(1)}h HOS
             </span>
           </div>

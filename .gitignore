@@ -19,6 +19,7 @@ frontend/dist/
 frontend/dist-ssr/
 frontend/.next/
 frontend/out/
+frontend/tsconfig.tsbuildinfo
 
 # macOS
 .DS_Store
