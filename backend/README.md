@@ -26,6 +26,13 @@ Source lives in `insforge/functions/<slug>/index.ts`. Deploy with:
 npx @insforge/cli functions deploy dispatch-recommend
 npx @insforge/cli functions deploy cost-insights
 npx @insforge/cli functions deploy simulate-assignment
+npx @insforge/cli functions deploy vision-monitor
+```
+
+Apply the SAURON Vision migration with:
+
+```bash
+npx @insforge/cli db query "$(cat insforge/migrations/003_vision_events.sql)"
 ```
 
 ## Testing
@@ -44,6 +51,9 @@ npx @insforge/cli functions invoke cost-insights
 # Simulate assignment
 npx @insforge/cli functions invoke simulate-assignment \
   --data '{"driver_id":"DRV003","pickup":"Denver, CO","destination":"Kansas City, MO"}'
+
+# Vision monitor smoke test
+npx @insforge/cli functions invoke vision-monitor --data '{"frames":[]}'
 ```
 
 ## Localhost Historical Queries
@@ -84,6 +94,10 @@ npx @insforge/cli diagnose                        # full health report
 
 One table: `drivers` — 8 rows, JSONB columns for `location`, `hos`, `vehicle`, `economics`, `current_load`.  
 Public read via RLS. No writes from the frontend.
+
+Additional SAURON Vision persistence:
+
+- `vision_events` stores persisted high-severity vision events from the `vision-monitor` function.
 
 ## Domain model planning
 
