@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Driver, DriverRecommendation, InsightCard, CostChartEntry, SimulationResult, GeoJSONFeature, RouteDeviation, TelemetryPosition } from '../types'
+import type { Driver, DriverRecommendation, InsightCard, CostChartEntry, SimulationResult, GeoJSONFeature, RouteDeviation, TelemetryPosition, FleetAlert } from '../types'
 
 interface FleetState {
   drivers: Driver[]
@@ -25,6 +25,8 @@ interface FleetState {
 
   deviations: RouteDeviation[]
   driverRoutes: Record<string, GeoJSONFeature>
+  alerts: FleetAlert[]
+  isLoadingAlerts: boolean
 
   setDrivers: (drivers: Driver[], source: 'navpro' | 'mock' | 'insforge') => void
   setSelectedDriver: (id: string | null) => void
@@ -41,6 +43,8 @@ interface FleetState {
   setDeviations: (devs: RouteDeviation[]) => void
   setDriverRoutes: (routes: Record<string, GeoJSONFeature>) => void
   patchPositions: (positions: Record<string, TelemetryPosition>) => void
+  setAlerts: (alerts: FleetAlert[]) => void
+  setIsLoadingAlerts: (v: boolean) => void
 }
 
 export const useFleetStore = create<FleetState>((set) => ({
@@ -67,6 +71,8 @@ export const useFleetStore = create<FleetState>((set) => ({
 
   deviations: [],
   driverRoutes: {},
+  alerts: [],
+  isLoadingAlerts: false,
 
   setDrivers: (drivers, source) =>
     set({ drivers, dataSource: source, lastUpdated: new Date(), isLoading: false }),
@@ -87,6 +93,8 @@ export const useFleetStore = create<FleetState>((set) => ({
 
   setDeviations: (devs) => set({ deviations: devs }),
   setDriverRoutes: (routes) => set({ driverRoutes: routes }),
+  setAlerts: (alerts) => set({ alerts, isLoadingAlerts: false }),
+  setIsLoadingAlerts: (v) => set({ isLoadingAlerts: v }),
   patchPositions: (positions) =>
     set((state) => ({
       drivers: state.drivers.map((d) => {
