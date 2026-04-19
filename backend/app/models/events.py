@@ -41,6 +41,9 @@ class RouteDeviationPayload(BaseModel):
     driver_id: str
     deviation_miles: float
     corridor: str
+    severity: str = "minor"
+    lat: float = 0.0
+    lng: float = 0.0
 
 
 class CardTransactionPayload(BaseModel):
