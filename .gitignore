@@ -31,3 +31,6 @@ frontend/out/
 # Claude
 **/.claude/
 **/CLAUDE.md
+
+# Random
+res/
