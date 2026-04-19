@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timezone
 from app.config import settings
-from app.routers import fleet, dispatch, chat, operations, simulate
+from app.routers import fleet, dispatch, chat, operations, simulate, auth
 
 app = FastAPI(title="Sauron Fleet API", version="1.0.0")
 
@@ -14,6 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(fleet.router)
 app.include_router(dispatch.router)
 app.include_router(chat.router)

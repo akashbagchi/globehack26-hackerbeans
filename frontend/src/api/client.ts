@@ -2,10 +2,26 @@
 import { createClient } from '@insforge/sdk'
 import type { Driver, DriverRecommendation, InsightCard, CostChartEntry, SimulationResult, ChatMessage } from '../types'
 
+export function getToken(): string | null {
+  try {
+    const raw = localStorage.getItem('sauron-auth')
+    return raw ? JSON.parse(raw)?.state?.token ?? null : null
+  } catch { return null }
+}
+
 const insforge = createClient({
   baseUrl: process.env.NEXT_PUBLIC_INSFORGE_URL!,
   anonKey: process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!,
 })
+
+export async function loginDispatcher(email: string, password: string) {
+  const { data, error } = await insforge.functions.invoke('auth-login', {
+    body: { email, password },
+  })
+  if (error) throw new Error('Invalid email or password')
+  if (data?.error) throw new Error(data.error)
+  return data
+}
 
 export async function fetchDrivers(): Promise<{ drivers: Driver[]; source: string }> {
   const { data, error } = await insforge.database.from('drivers').select()
