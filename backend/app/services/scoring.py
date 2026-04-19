@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import List
 
 from app.models.ai import DispatchRecommendation, DriverRecommendation
-from app.models.analytics import DispatchScoringSignalsReport
+from app.models.analytics import DispatchHistoricalSignal, DispatchScoringSignalsReport
 from app.models.driver import Driver
 from app.services.navpro import AVG_SPEED_MPH, haversine_miles, resolve_coords
 
@@ -40,7 +40,7 @@ class _DriverFactors:
     hos_surplus_hrs: float
     factors: dict[str, float] = field(default_factory=dict)
     score: int = 0
-    historical_signal = None
+    historical_signal: DispatchHistoricalSignal | None = None
 
 
 def score_drivers(
@@ -83,15 +83,15 @@ def score_drivers(
             )
         )
 
-    # Fleet-level stats for relative cost normalization
     cpms = [e.driver.economics.cost_per_mile for e in entries]
     min_cpm, max_cpm = min(cpms), max(cpms)
     cpm_range = max_cpm - min_cpm
-
     avg_cpm = sum(cpms) / len(cpms)
-    historical_signal_map = {
-        signal.driver_id: signal for signal in historical_signals.driver_signals
-    } if historical_signals else {}
+    historical_signal_map = (
+        {signal.driver_id: signal for signal in historical_signals.driver_signals}
+        if historical_signals
+        else {}
+    )
 
     w = config.weights
 
@@ -134,7 +134,6 @@ def score_drivers(
         )
         entry.score = round(raw * 100)
 
-    # Sort: score desc, cost asc, driver_id asc for deterministic tie-breaking
     entries.sort(key=lambda e: (-e.score, e.driver.economics.cost_per_mile, e.driver.driver_id))
 
     results = entries[: config.max_results]
@@ -143,7 +142,7 @@ def score_drivers(
     for rank, entry in enumerate(results, start=1):
         d = entry.driver
         cost_delta = d.economics.cost_per_mile - avg_cpm
-        reasoning = _build_reasoning(entry, avg_cpm)
+        reasoning = _build_reasoning(entry)
 
         recommendations.append(
             DriverRecommendation(
@@ -174,7 +173,7 @@ def score_drivers(
     return DispatchRecommendation(recommendations=recommendations, dispatch_note=note)
 
 
-def _build_reasoning(entry: _DriverFactors, avg_cpm: float) -> str:
+def _build_reasoning(entry: _DriverFactors) -> str:
     d = entry.driver
     factor_labels = {
         "proximity": f"{entry.deadhead_miles:.0f}mi deadhead",
@@ -190,7 +189,6 @@ def _build_reasoning(entry: _DriverFactors, avg_cpm: float) -> str:
         ),
     }
 
-    # Sort factors by weighted contribution descending
     weights = ScoringWeights()
     weighted = sorted(
         entry.factors.items(),

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
-import { ArrowLeft, Plus, Save, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, BellRing, Clock3, Plus, Save, Trash2 } from 'lucide-react'
+import { fetchConsignmentNotifications } from '../../api/client'
 import type {
   CargoClass,
   Consignment,
@@ -7,6 +8,7 @@ import type {
   ConsignmentPayload,
   ConsignmentStatus,
   NotificationChannel,
+  ReceiverNotification,
 } from '../../types'
 
 const cargoClassOptions: CargoClass[] = ['general', 'hazmat', 'refrigerated', 'oversized', 'high_value']
@@ -41,6 +43,20 @@ function toDateTimeLocal(value: string | null) {
 function toIsoOrNull(value: string) {
   if (!value) return null
   return new Date(value).toISOString()
+}
+
+function formatNotificationTimestamp(value: string | null) {
+  if (!value) return 'TBD'
+  return new Date(value).toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function formatNotificationLabel(notificationType: string) {
+  return notificationType.replace(/_/g, ' ')
 }
 
 function createDefaultState(dispatchDate: string): FormState {
@@ -112,6 +128,9 @@ export function ConsignmentEditor({
   onDelete,
 }: ConsignmentEditorProps) {
   const [formState, setFormState] = useState<FormState>(() => stateFromConsignment(consignment, dispatchDate))
+  const [notifications, setNotifications] = useState<ReceiverNotification[]>([])
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false)
+  const [notificationError, setNotificationError] = useState<string | null>(null)
 
   const isEditing = Boolean(consignment)
   const title = isEditing ? consignment?.consignment_id : 'New Consignment'
@@ -202,6 +221,44 @@ export function ConsignmentEditor({
   function updateField<Key extends keyof FormState>(key: Key, value: FormState[Key]) {
     setFormState((current) => ({ ...current, [key]: value }))
   }
+
+  useEffect(() => {
+    if (!consignment?.consignment_id) {
+      return
+    }
+
+    let cancelled = false
+
+    async function loadNotifications() {
+      setIsLoadingNotifications(true)
+      setNotificationError(null)
+      try {
+        const response = await fetchConsignmentNotifications({
+          fleetId: consignment.fleet_id,
+          consignmentId: consignment.consignment_id,
+        })
+        if (!cancelled) {
+          setNotifications(response.data)
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setNotificationError(
+            error instanceof Error ? error.message : 'Unable to load receiver notification history',
+          )
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingNotifications(false)
+        }
+      }
+    }
+
+    loadNotifications()
+
+    return () => {
+      cancelled = true
+    }
+  }, [consignment?.consignment_id, consignment?.fleet_id])
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -467,6 +524,77 @@ export function ConsignmentEditor({
             ))}
           </div>
         </div>
+
+        {isEditing && (
+          <div className="rounded-2xl border border-[#dadce0] bg-[#f8f9fa] p-3">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#5f6368]">
+                <BellRing size={13} />
+                Receiver Notifications
+              </div>
+              <div className="text-[11px] text-[#5f6368]">
+                {notifications.length} sent updates
+              </div>
+            </div>
+
+            {isLoadingNotifications && (
+              <div className="rounded-xl border border-[#dadce0] bg-white px-3 py-3 text-xs text-[#5f6368]">
+                Loading notification history...
+              </div>
+            )}
+
+            {!isLoadingNotifications && notificationError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3 text-xs text-red-700">
+                {notificationError}
+              </div>
+            )}
+
+            {!isLoadingNotifications && !notificationError && notifications.length === 0 && (
+              <div className="rounded-xl border border-dashed border-[#dadce0] bg-white px-3 py-4 text-xs text-[#5f6368]">
+                No receiver updates have been sent yet. Assignment, ETA, delay, and delivery changes will appear here automatically.
+              </div>
+            )}
+
+            {!isLoadingNotifications && !notificationError && notifications.length > 0 && (
+              <div className="space-y-3">
+                {notifications.map((notification) => (
+                  <div
+                    key={notification.receiver_notification_id}
+                    className="rounded-xl border border-[#dadce0] bg-white p-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium text-[#202124]">
+                          {formatNotificationLabel(notification.notification_type)}
+                        </div>
+                        <div className="mt-1 text-xs text-[#5f6368]">
+                          {notification.channel.toUpperCase()} to {notification.recipient}
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-[#e8f0fe] px-2 py-1 text-[11px] font-medium text-[#1a73e8]">
+                        {notification.delivery_status}
+                      </span>
+                    </div>
+
+                    {notification.message_text && (
+                      <p className="mt-3 text-sm leading-6 text-[#202124]">{notification.message_text}</p>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-[#5f6368]">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock3 size={12} />
+                        Sent {formatNotificationTimestamp(notification.sent_at)}
+                      </span>
+                      {notification.eta_at && (
+                        <span>ETA {formatNotificationTimestamp(notification.eta_at)}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </form>
 
       <div className="border-t border-[#dadce0] px-4 py-3 shrink-0">

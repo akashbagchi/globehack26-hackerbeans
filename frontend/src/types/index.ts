@@ -194,6 +194,49 @@ export interface ConsignmentPayload {
   receiver_contact_preferences: ConsignmentContactPreference[]
 }
 
+export interface ReceiverNotification {
+  receiver_notification_id: string
+  fleet_id: string
+  consignment_id: string
+  assignment_id: string | null
+  notification_type: string
+  channel: NotificationChannel
+  recipient: string
+  sent_at: string
+  delivery_status: string
+  eta_at: string | null
+  message_template: string | null
+  message_text: string | null
+  context: Record<string, unknown>
+  external_reference: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type OrchestrationDecision = 'auto_assigned' | 'needs_review' | 'no_match'
+
+export interface AssignmentPlan {
+  consignment_id: string
+  consignment_summary: string
+  assigned_driver_id: string | null
+  assigned_truck_id: string | null
+  score: number
+  reasoning: string
+  decision: OrchestrationDecision
+  skip_reasons: string[]
+}
+
+export interface OrchestrationResult {
+  fleet_id: string
+  dispatch_date: string
+  total_consignments: number
+  auto_assigned: number
+  needs_review: number
+  no_match: number
+  plans: AssignmentPlan[]
+  drivers_used: string[]
+}
+
 export interface SimulationResult {
   driver_id: string
   driver_name: string
@@ -254,4 +297,50 @@ export interface RouteDeviation {
   lng: number
   corridor: string
   resolved: boolean
+}
+
+export type VisionIssueType =
+  | 'fatigue'
+  | 'phone_distraction'
+  | 'road_hazard'
+  | 'load_security'
+  | 'seatbelt'
+
+export interface VisionIssue {
+  type: VisionIssueType
+  score: number
+  confidence: number
+}
+
+export interface VisionDriverAlert {
+  driver_id: string
+  driver_name: string
+  truck_number: string
+  status: 'clear' | 'watch' | 'critical'
+  attention_score: number
+  confidence: number
+  summary: string
+  recommended_action: string
+  detected_at: string
+  primary_issue: VisionIssueType | null
+  issues: VisionIssue[]
+  video_url: string | null
+}
+
+export interface VisionMonitorFrame {
+  driver_id: string
+  driver_name: string
+  truck_number: string
+  timestamp: string
+  video_url: string | null
+  status: Driver['status']
+  frame: string
+  context: {
+    city: string
+    state: string
+    speed_mph: number
+    hos_remaining_hrs: number
+    load_description: string | null
+    eta: string | null
+  }
 }

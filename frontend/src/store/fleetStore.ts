@@ -7,9 +7,11 @@ import type {
   SimulationResult,
   GeoJSONFeature,
   Consignment,
+  OrchestrationResult,
   RouteDeviation,
   TelemetryPosition,
   FleetAlert,
+  VisionDriverAlert,
 } from '../types'
 
 function todayIsoDate() {
@@ -48,7 +50,15 @@ interface FleetState {
   driverRoutes: Record<string, GeoJSONFeature>
   alerts: FleetAlert[]
   isLoadingAlerts: boolean
+  visionByDriver: Record<string, VisionDriverAlert>
+  visionHistory: VisionDriverAlert[]
+  lastVisionScanAt: string | null
+  orchestrationResult: OrchestrationResult | null
+  isOrchestrating: boolean
+  isVisionMonitoring: boolean
 
+  setOrchestrationResult: (result: OrchestrationResult | null) => void
+  setIsOrchestrating: (v: boolean) => void
   setDrivers: (drivers: Driver[], source: 'navpro' | 'mock' | 'insforge') => void
   setConsignments: (consignments: Consignment[]) => void
   setSelectedDriver: (id: string | null) => void
@@ -74,6 +84,8 @@ interface FleetState {
   patchPositions: (positions: Record<string, TelemetryPosition>) => void
   setAlerts: (alerts: FleetAlert[]) => void
   setIsLoadingAlerts: (v: boolean) => void
+  setVisionResults: (alerts: VisionDriverAlert[]) => void
+  setIsVisionMonitoring: (v: boolean) => void
 }
 
 export const useFleetStore = create<FleetState>((set) => ({
@@ -108,7 +120,15 @@ export const useFleetStore = create<FleetState>((set) => ({
   driverRoutes: {},
   alerts: [],
   isLoadingAlerts: false,
+  visionByDriver: {},
+  visionHistory: [],
+  lastVisionScanAt: null,
+  orchestrationResult: null,
+  isOrchestrating: false,
+  isVisionMonitoring: false,
 
+  setOrchestrationResult: (result) => set({ orchestrationResult: result, isOrchestrating: false }),
+  setIsOrchestrating: (v) => set({ isOrchestrating: v }),
   setDrivers: (drivers, source) =>
     set({ drivers, dataSource: source, lastUpdated: new Date(), isLoading: false }),
   setConsignments: (consignments) =>
@@ -154,6 +174,32 @@ export const useFleetStore = create<FleetState>((set) => ({
   setDriverRoutes: (routes) => set({ driverRoutes: routes }),
   setAlerts: (alerts) => set({ alerts, isLoadingAlerts: false }),
   setIsLoadingAlerts: (v) => set({ isLoadingAlerts: v }),
+  setVisionResults: (alerts) =>
+    set((state) => {
+      const nextByDriver = alerts.reduce<Record<string, VisionDriverAlert>>((acc, alert) => {
+        acc[alert.driver_id] = alert
+        return acc
+      }, {})
+
+      const history = [...alerts, ...state.visionHistory]
+        .sort((a, b) => new Date(b.detected_at).getTime() - new Date(a.detected_at).getTime())
+        .filter((alert, index, arr) =>
+          arr.findIndex((candidate) =>
+            candidate.driver_id === alert.driver_id &&
+            candidate.detected_at === alert.detected_at &&
+            candidate.primary_issue === alert.primary_issue
+          ) === index
+        )
+        .slice(0, 25)
+
+      return {
+        visionByDriver: nextByDriver,
+        visionHistory: history,
+        lastVisionScanAt: new Date().toISOString(),
+        isVisionMonitoring: false,
+      }
+    }),
+  setIsVisionMonitoring: (v) => set({ isVisionMonitoring: v }),
   patchPositions: (positions) =>
     set((state) => ({
       drivers: state.drivers.map((d) => {

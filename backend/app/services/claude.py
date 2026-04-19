@@ -1,11 +1,13 @@
 import json
 import logging
 from typing import AsyncIterator, List
+
 import anthropic
 from fastapi import HTTPException
+
 from app.config import settings
-from app.models.driver import Driver
 from app.models.ai import ChatMessage
+from app.models.driver import Driver
 
 logger = logging.getLogger(__name__)
 

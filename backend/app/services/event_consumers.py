@@ -7,10 +7,12 @@ from app.models.events import (
     BreakdownEvent,
     FleetEvent,
     HOSThresholdWarningEvent,
+    ReceiverNotificationEvent,
     RouteDeviationEvent,
     TelemetryUpdateEvent,
 )
 from app.services.event_bus import FleetEventBus
+from app.services.operations import create_route_event_notification
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +68,49 @@ async def _watch_route_deviations(event: FleetEvent) -> None:
         event.payload.deviation_miles,
         event.payload.corridor,
     )
+    await create_route_event_notification(
+        fleet_id=event.fleet_id,
+        assignment_id=event.payload.assignment_id,
+        driver_id=event.payload.driver_id,
+        notification_type="route_impact_alert",
+        reason=f"{event.payload.severity} route deviation in {event.payload.corridor}",
+        eta_shift_minutes=45 if event.payload.severity == "major" else 20,
+        extra_context={
+            "deviation_miles": event.payload.deviation_miles,
+            "corridor": event.payload.corridor,
+            "severity": event.payload.severity,
+            "lat": event.payload.lat,
+            "lng": event.payload.lng,
+        },
+    )
+
+
+async def _watch_breakdown_notifications(event: FleetEvent) -> None:
+    if not isinstance(event, BreakdownEvent):
+        return
+    await create_route_event_notification(
+        fleet_id=event.fleet_id,
+        assignment_id=None,
+        driver_id=event.payload.driver_id,
+        notification_type="exception_alert",
+        reason=event.payload.summary,
+        eta_shift_minutes=90 if event.payload.severity in {"high", "critical"} else 45,
+        extra_context={
+            "severity": event.payload.severity,
+            "truck_id": event.payload.truck_id,
+        },
+    )
+
+
+async def _watch_receiver_notifications(event: FleetEvent) -> None:
+    if not isinstance(event, ReceiverNotificationEvent):
+        return
+    logger.info(
+        "receiver notification %s -> %s [%s]",
+        event.payload.consignment_id,
+        event.payload.recipient,
+        event.payload.status,
+    )
 
 
 def register_core_consumers(bus: FleetEventBus) -> None:
@@ -77,5 +122,8 @@ def register_core_consumers(bus: FleetEventBus) -> None:
     bus.register_handler("hos.threshold_warning.v1", _watch_hos_alerts)
     bus.register_handler("breakdown.reported.v1", _log_event)
     bus.register_handler("breakdown.reported.v1", _watch_breakdowns)
+    bus.register_handler("breakdown.reported.v1", _watch_breakdown_notifications)
     bus.register_handler("route.deviation_detected.v1", _log_event)
     bus.register_handler("route.deviation_detected.v1", _watch_route_deviations)
+    bus.register_handler("receiver.notification_sent.v1", _log_event)
+    bus.register_handler("receiver.notification_sent.v1", _watch_receiver_notifications)

@@ -1,4 +1,5 @@
 import unittest
+from dataclasses import dataclass
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -71,6 +72,59 @@ class DispatchRouterTests(unittest.TestCase):
         self.assertEqual(body["historical_signals"]["lane_assignment_count"], 4)
         mock_signals.assert_awaited_once()
         self.assertIs(mock_score.call_args.kwargs["historical_signals"], historical_report)
+
+    def test_orchestrate_dispatch_returns_orchestration_summary(self):
+        @dataclass
+        class OrchestrationResultStub:
+            fleet_id: str
+            dispatch_date: str
+            total_consignments: int
+            auto_assigned: int
+            needs_review: int
+            no_match: int
+            plans: list[dict]
+            drivers_used: list[str]
+
+        orchestration_result = OrchestrationResultStub(
+            fleet_id="fleet_demo",
+            dispatch_date="2026-04-19",
+            total_consignments=3,
+            auto_assigned=2,
+            needs_review=1,
+            no_match=0,
+            plans=[],
+            drivers_used=["DRV001", "DRV002"],
+        )
+
+        with patch.object(
+            dispatch_module,
+            "orchestrate_daily_dispatch",
+            new=AsyncMock(return_value=orchestration_result),
+        ) as mock_orchestrate:
+            response = self.client.post(
+                "/dispatch/orchestrate",
+                json={
+                    "fleet_id": "fleet_demo",
+                    "dispatch_date": "2026-04-19",
+                    "dispatcher_id": "DSP001",
+                    "auto_assign_threshold": 75,
+                    "review_threshold": 55,
+                    "dry_run": True,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["data"]["fleet_id"], "fleet_demo")
+        self.assertEqual(body["data"]["auto_assigned"], 2)
+        self.assertEqual(body["data"]["drivers_used"], ["DRV001", "DRV002"])
+        mock_orchestrate.assert_awaited_once()
+        kwargs = mock_orchestrate.await_args.kwargs
+        self.assertEqual(kwargs["fleet_id"], "fleet_demo")
+        self.assertEqual(kwargs["dispatcher_id"], "DSP001")
+        self.assertEqual(kwargs["auto_assign_threshold"], 75)
+        self.assertEqual(kwargs["review_threshold"], 55)
+        self.assertTrue(kwargs["dry_run"])
 
 
 if __name__ == "__main__":

@@ -1,14 +1,29 @@
+from dataclasses import asdict
+from datetime import date, datetime, timezone
+
 from fastapi import APIRouter, Query, Request
-from datetime import datetime, timezone
+from pydantic import BaseModel, Field
+
+from app.limiter import limiter
+from app.models.events import AssignmentDecisionEvent, AssignmentDecisionPayload
 from app.models.load import LoadRequest
-from app.services.navpro import get_drivers
 from app.services.claude import get_cost_insights, enrich_recommendations_with_ai
 from app.services.dispatch_scoring import build_dispatch_scoring_signals
 from app.services.eligibility import evaluate_driver_for_load
-from app.services.scoring import score_drivers
-from app.models.events import AssignmentDecisionEvent, AssignmentDecisionPayload
 from app.services.event_bus import event_bus
-from app.limiter import limiter
+from app.services.navpro import get_drivers
+from app.services.orchestrator import orchestrate_daily_dispatch
+from app.services.scoring import score_drivers
+
+
+class OrchestrationRequest(BaseModel):
+    fleet_id: str
+    dispatch_date: date
+    dispatcher_id: str
+    auto_assign_threshold: int = Field(default=70, ge=0, le=100)
+    review_threshold: int = Field(default=50, ge=0, le=100)
+    dry_run: bool = False
+
 
 router = APIRouter(prefix="/dispatch", tags=["dispatch"])
 
@@ -91,6 +106,23 @@ async def recommend_dispatch(
     if historical_signals:
         response["historical_signals"] = historical_signals.model_dump(mode="json")
     return response
+
+
+@router.post("/orchestrate")
+@limiter.limit("5/minute")
+async def orchestrate_dispatch(request: Request, req: OrchestrationRequest):
+    result = await orchestrate_daily_dispatch(
+        fleet_id=req.fleet_id,
+        dispatch_date=req.dispatch_date,
+        dispatcher_id=req.dispatcher_id,
+        auto_assign_threshold=req.auto_assign_threshold,
+        review_threshold=req.review_threshold,
+        dry_run=req.dry_run,
+    )
+    return {
+        "data": asdict(result),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/cost-insights")

@@ -21,6 +21,7 @@ frontend/dist-ssr/
 frontend/.next/
 frontend/out/
 frontend/tsconfig.tsbuildinfo
+frontend/public/videos/vision/*.mp4
 **/.pnpm-store
 
 # macOS

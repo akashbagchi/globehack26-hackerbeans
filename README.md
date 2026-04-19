@@ -2,7 +2,7 @@
 
 GlobeHack Season 1 · TruckerPath / Marketplace & Growth track
 
-AI dispatch assistant for trucking fleets. Live driver map, Claude-powered dispatch recommendations, cost intelligence, and streaming chat.
+AI dispatch assistant for trucking fleets. Live driver map, Claude-powered dispatch recommendations, cost intelligence, streaming chat, and SAURON Vision for proactive fleet camera monitoring.
 
 ---
 
@@ -44,7 +44,34 @@ cd backend
 npx @insforge/cli functions deploy dispatch-recommend
 npx @insforge/cli functions deploy cost-insights
 npx @insforge/cli functions deploy simulate-assignment
+npx @insforge/cli functions deploy vision-monitor
 ```
+
+Apply new SQL migrations with:
+
+```bash
+cd backend
+npx @insforge/cli db query "$(cat insforge/migrations/003_vision_events.sql)"
+```
+
+## SAURON Vision Demo Setup
+
+1. Put demo videos in `frontend/public/videos/vision/` as `1.mp4` through `7.mp4`.
+2. Those files are intentionally gitignored and stay local to your demo machine.
+3. Only `driving` trucks get assigned camera feeds.
+4. The frontend samples those feeds in the background and sends frames to the `vision-monitor` InsForge function.
+
+Visible operator surfaces:
+
+- Driver detail panel live feed
+- Auto-prioritized map feed
+- Critical vision alert card
+- Marker risk halos based on attention score
+
+Alert behavior:
+
+- SAURON first attempts Claude vision analysis on real sampled frames.
+- If the AI response fails, the demo falls back to a deterministic scorer so the experience stays resilient.
 
 ---
 

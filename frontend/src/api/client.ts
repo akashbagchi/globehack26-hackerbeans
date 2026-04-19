@@ -9,10 +9,14 @@ import type {
   ChatMessage,
   Consignment,
   ConsignmentPayload,
+  ReceiverNotification,
   TelemetryPosition,
   RouteDeviation,
   GeoJSONFeature,
   FleetAlert,
+  OrchestrationResult,
+  VisionDriverAlert,
+  VisionMonitorFrame,
 } from '../types'
 
 export function getToken(): string | null {
@@ -235,6 +239,21 @@ export async function fetchConsignmentById(params: {
   )
 }
 
+export async function fetchConsignmentNotifications(params: {
+  fleetId: string
+  consignmentId: string
+}): Promise<{ data: ReceiverNotification[]; count: number; fleet_id: string }> {
+  const search = new URLSearchParams({ fleet_id: params.fleetId })
+  return requestOperations(
+    `${operationsBaseUrl}/operations/consignments/${params.consignmentId}/notifications?${search.toString()}`,
+    {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    },
+  )
+}
+
 export async function createConsignment(payload: ConsignmentPayload): Promise<{ data: Consignment }> {
   return requestOperations(`${operationsBaseUrl}/operations/consignments`, {
     method: 'POST',
@@ -271,6 +290,24 @@ export async function deleteConsignment(params: {
       headers: { Accept: 'application/json' },
     },
   )
+}
+
+export async function orchestrateDailyDispatch(params: {
+  fleetId: string
+  dispatchDate: string
+  dispatcherId: string
+  dryRun?: boolean
+}): Promise<{ data: OrchestrationResult; timestamp: string }> {
+  return requestOperations(`${operationsBaseUrl}/dispatch/orchestrate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      fleet_id: params.fleetId,
+      dispatch_date: params.dispatchDate,
+      dispatcher_id: params.dispatcherId,
+      dry_run: params.dryRun ?? false,
+    }),
+  })
 }
 
 export async function fetchAlerts(): Promise<FleetAlert[]> {
@@ -322,6 +359,14 @@ export async function fetchTelemetryDeviations(): Promise<RouteDeviation[]> {
   const { data, error } = await insforge.database.from('route_deviations').select()
   if (error) throw new Error(String(error))
   return (data ?? []) as unknown as RouteDeviation[]
+}
+
+export async function runVisionMonitor(payload: {
+  frames: VisionMonitorFrame[]
+}): Promise<{ alerts: VisionDriverAlert[] }> {
+  const { data, error } = await insforge.functions.invoke('vision-monitor', { body: payload })
+  if (error) throw new Error(String(error))
+  return data.data
 }
 
 type RouteRow = {
