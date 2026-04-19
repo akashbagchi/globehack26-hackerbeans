@@ -387,6 +387,17 @@ class ReceiverNotification(AuditFields):
     external_reference: Optional[str] = None
 
 
+class TestNotifyPayload(BaseModel):
+    driver_id: str
+    driver_name: Optional[str] = None
+    reason: str
+    eta_delta: int = Field(default=45, ge=1)
+    load_id: str
+    consignment_id: Optional[str] = None
+    receiver_phone: str
+    receiver_name: Optional[str] = None
+
+
 class ReconciliationEvent(AuditFields):
     reconciliation_event_id: str
     consignment_id: str

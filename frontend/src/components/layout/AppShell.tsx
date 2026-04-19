@@ -7,6 +7,7 @@ import { ChatPanel } from '../chat/ChatPanel'
 import { NarratorBanner } from '../narrator/NarratorBanner'
 import { DispatchWorkspace } from '../dispatch/DispatchWorkspace'
 import { AlertsPanel } from '../alerts/AlertsPanel'
+import { ProactiveNotifyFeed } from '../notifications/ProactiveNotifyFeed'
 import { useFleetStore } from '../../store/fleetStore'
 
 const ICON_TABS = [
@@ -67,6 +68,7 @@ export function AppShell() {
         {/* Map */}
         <div className="flex-1 min-w-0 relative">
           <FleetMap />
+          <ProactiveNotifyFeed />
         </div>
       </div>
 

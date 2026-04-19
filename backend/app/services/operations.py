@@ -328,6 +328,91 @@ async def list_receiver_notifications(
     )
 
 
+import logging as _logging
+
+_logger = _logging.getLogger(__name__)
+
+
+async def call_proactive_notify(
+    *,
+    driver_id: str,
+    driver_name: str | None,
+    reason: str,
+    eta_delta: int,
+    load_id: str,
+    consignment_id: str | None,
+    receiver_phone: str,
+    receiver_name: str | None,
+) -> None:
+    """Fire-and-forget POST to the proactive-notify InsForge edge function.
+    Errors are logged but never propagated — callers must not be interrupted.
+    """
+    if not settings.insforge_base_url or not settings.insforge_anon_key:
+        _logger.warning("call_proactive_notify: InsForge not configured, skipping")
+        return
+
+    url = f"{settings.insforge_base_url.rstrip('/')}/functions/proactive-notify"
+    payload = {
+        "driverId": driver_id,
+        "driverName": driver_name,
+        "reason": reason,
+        "etaDelta": eta_delta,
+        "loadId": load_id,
+        "consignmentId": consignment_id,
+        "receiverPhone": receiver_phone,
+        "receiverName": receiver_name,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                url,
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {settings.insforge_anon_key}",
+                    "Content-Type": "application/json",
+                },
+            )
+        _logger.info("proactive-notify responded %s", resp.status_code)
+    except Exception as exc:
+        _logger.warning("proactive-notify call failed: %s", exc)
+
+
+async def _resolve_consignment_for_driver(
+    fleet_id: str,
+    assignment_id: str | None,
+    driver_id: str | None,
+) -> dict[str, Any] | None:
+    """Look up the active consignment for a driver, via assignment or direct driver lookup."""
+    if assignment_id:
+        assignment_rows = await _fetch_records(
+            "assignments",
+            {
+                "fleet_id": f"eq.{fleet_id}",
+                "assignment_id": f"eq.{assignment_id}",
+                "limit": "1",
+            },
+        )
+        if assignment_rows:
+            consignment_id = assignment_rows[0].get("consignment_id")
+            if consignment_id:
+                return await get_consignment(fleet_id=fleet_id, consignment_id=consignment_id)
+
+    if driver_id:
+        rows = await _fetch_records(
+            "consignments",
+            {
+                "fleet_id": f"eq.{fleet_id}",
+                "assigned_driver_id": f"eq.{driver_id}",
+                "status": "in.(assigned,dispatched,in_transit,delayed,exception)",
+                "order": "updated_at.desc",
+                "limit": "1",
+            },
+        )
+        return rows[0] if rows else None
+
+    return None
+
+
 def _estimate_eta_shift(
     *,
     base_eta: str | None,

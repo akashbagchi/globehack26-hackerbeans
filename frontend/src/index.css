@@ -29,6 +29,13 @@ html, body {
 
 .animate-slide-up { animation: slide-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
 
+@keyframes pulse-once {
+  0%   { box-shadow: 0 0 0 0 rgba(26, 115, 232, 0.5); }
+  50%  { box-shadow: 0 0 0 6px rgba(26, 115, 232, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(26, 115, 232, 0); }
+}
+.animate-pulse-once { animation: pulse-once 1.2s ease-out 2; }
+
 @keyframes deviation-pulse {
   0%, 100% { box-shadow: 0 0 0 3px rgba(239,68,68,0.4); }
   50%       { box-shadow: 0 0 0 8px rgba(239,68,68,0); }
