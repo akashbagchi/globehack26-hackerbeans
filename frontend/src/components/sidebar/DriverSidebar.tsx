@@ -1,12 +1,15 @@
 import { useState } from 'react'
-import { Search } from 'lucide-react'
+import { Search, AlertTriangle } from 'lucide-react'
 import { useFleetStore } from '../../store/fleetStore'
 import { DriverCard } from './DriverCard'
 
 export function DriverSidebar() {
   const drivers = useFleetStore((s) => s.drivers)
+  const deviations = useFleetStore((s) => s.deviations)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+
+  const activeDeviations = deviations.filter((d) => !d.resolved)
 
   const filtered = drivers.filter((d) => {
     const matchSearch = d.name.toLowerCase().includes(search.toLowerCase())
@@ -53,6 +56,33 @@ export function DriverSidebar() {
           </select>
         </div>
       </div>
+
+      {/* Deviation alerts */}
+      {activeDeviations.length > 0 && (
+        <div className="px-4 py-2 border-b border-[#dadce0] shrink-0 space-y-1">
+          {activeDeviations.map((dev) => (
+            <div
+              key={dev.driver_id}
+              className={`flex items-start gap-2 px-3 py-2 rounded text-xs ${
+                dev.severity === 'major'
+                  ? 'bg-red-50 border border-red-200 text-red-800'
+                  : 'bg-orange-50 border border-orange-200 text-orange-800'
+              }`}
+            >
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+              <div>
+                <span className="font-semibold">{dev.driver_name}</span>
+                {' — '}
+                {dev.deviation_miles} mi off-route
+                <span className="ml-1 uppercase font-bold text-[10px]">
+                  [{dev.severity}]
+                </span>
+                <div className="text-[10px] opacity-70 mt-0.5">{dev.load_id}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Driver list */}
       <div className="flex-1 overflow-y-auto">

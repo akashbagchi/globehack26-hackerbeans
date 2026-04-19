@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type Panel = 'dispatch' | 'costs' | 'chat'
+type Panel = 'dispatch' | 'costs' | 'chat' | 'alerts'
 
 interface UIState {
   activePanel: Panel

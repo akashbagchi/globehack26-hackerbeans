@@ -8,6 +8,7 @@ import { TruckMarkers } from './TruckMarker'
 import { TruckModelLayer } from './TruckModelLayer'
 import { RouteLayer } from './RouteLayer'
 import { GhostRouteLayer } from './GhostRouteLayer'
+import { DeviationLayer } from './DeviationLayer'
 
 export function FleetMap() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -54,6 +55,7 @@ export function FleetMap() {
           <TruckMarkers map={map} />
           <RouteLayer map={map} />
           <GhostRouteLayer map={map} />
+          <DeviationLayer map={map} />
         </>
       )}
       <div className="absolute bottom-4 right-4 flex flex-col gap-2">
