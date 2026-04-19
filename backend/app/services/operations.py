@@ -264,6 +264,61 @@ async def delete_consignment(
     return True
 
 
+def _generate_assignment_id() -> str:
+    return f"ASN{uuid4().hex[:8].upper()}"
+
+
+async def create_assignment(
+    fleet_id: str,
+    consignment_id: str,
+    dispatcher_id: str,
+    driver_id: str,
+    truck_id: str,
+    notes: str | None = None,
+) -> dict[str, Any]:
+    assignment_id = _generate_assignment_id()
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    values = {
+        "assignment_id": assignment_id,
+        "fleet_id": fleet_id,
+        "consignment_id": consignment_id,
+        "dispatcher_id": dispatcher_id,
+        "driver_id": driver_id,
+        "truck_id": truck_id,
+        "status": "planned",
+        "assigned_at": now,
+        "notes": notes,
+        "created_at": now,
+        "updated_at": now,
+    }
+    created = await _mutate_records("POST", "assignments", json_body=[values])
+
+    # Update the consignment to reflect the assignment
+    await _mutate_records(
+        "PATCH",
+        "consignments",
+        params={
+            "fleet_id": f"eq.{fleet_id}",
+            "consignment_id": f"eq.{consignment_id}",
+        },
+        json_body={
+            "assigned_driver_id": driver_id,
+            "assigned_truck_id": truck_id,
+            "current_assignment_id": assignment_id,
+            "status": "assigned",
+            "updated_at": now,
+        },
+    )
+
+    if isinstance(created, list) and created:
+        return created[0]
+    rows = await _fetch_records("assignments", {
+        "assignment_id": f"eq.{assignment_id}",
+        "limit": "1",
+    })
+    return rows[0] if rows else values
+
+
 async def list_assignments(
     fleet_id: str,
     from_ts: datetime | None = None,

@@ -77,6 +77,15 @@ class AssignmentDecisionPayload(BaseModel):
     rejected_driver_ids: list[str] = Field(default_factory=list)
 
 
+class OrchestrationCompletedPayload(BaseModel):
+    dispatch_date: str
+    total_consignments: int
+    auto_assigned: int
+    needs_review: int
+    no_match: int
+    driver_ids_used: list[str] = Field(default_factory=list)
+
+
 class ReceiverNotificationPayload(BaseModel):
     consignment_id: str
     channel: str
@@ -119,6 +128,11 @@ class AssignmentDecisionEvent(FleetEventEnvelope):
     payload: AssignmentDecisionPayload
 
 
+class OrchestrationCompletedEvent(FleetEventEnvelope):
+    event_type: Literal["dispatch.orchestration_completed.v1"] = "dispatch.orchestration_completed.v1"
+    payload: OrchestrationCompletedPayload
+
+
 class ReceiverNotificationEvent(FleetEventEnvelope):
     event_type: Literal["receiver.notification_sent.v1"] = "receiver.notification_sent.v1"
     payload: ReceiverNotificationPayload
@@ -132,6 +146,7 @@ FleetEvent = Union[
     DriverCheckInEvent,
     BreakdownEvent,
     AssignmentDecisionEvent,
+    OrchestrationCompletedEvent,
     ReceiverNotificationEvent,
 ]
 

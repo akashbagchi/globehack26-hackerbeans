@@ -194,6 +194,30 @@ export interface ConsignmentPayload {
   receiver_contact_preferences: ConsignmentContactPreference[]
 }
 
+export type OrchestrationDecision = 'auto_assigned' | 'needs_review' | 'no_match'
+
+export interface AssignmentPlan {
+  consignment_id: string
+  consignment_summary: string
+  assigned_driver_id: string | null
+  assigned_truck_id: string | null
+  score: number
+  reasoning: string
+  decision: OrchestrationDecision
+  skip_reasons: string[]
+}
+
+export interface OrchestrationResult {
+  fleet_id: string
+  dispatch_date: string
+  total_consignments: number
+  auto_assigned: number
+  needs_review: number
+  no_match: number
+  plans: AssignmentPlan[]
+  drivers_used: string[]
+}
+
 export interface SimulationResult {
   driver_id: string
   driver_name: string

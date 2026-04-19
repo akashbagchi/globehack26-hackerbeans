@@ -1,5 +1,5 @@
-import { AlertTriangle, CalendarDays, Clock3, PackagePlus, RefreshCcw, Truck } from 'lucide-react'
-import type { Consignment, ConsignmentStatus } from '../../types'
+import { AlertTriangle, CalendarDays, Clock3, Loader2, PackagePlus, RefreshCcw, Truck, Zap } from 'lucide-react'
+import type { Consignment, ConsignmentStatus, OrchestrationResult } from '../../types'
 
 type BoardColumn = {
   id: string
@@ -57,9 +57,13 @@ interface DispatchBoardProps {
   selectedDispatchDate: string
   isLoading: boolean
   error: string | null
+  orchestrationResult: OrchestrationResult | null
+  isOrchestrating: boolean
   onRefresh: () => void
   onCreate: () => void
   onSelect: (consignmentId: string) => void
+  onOrchestrate: () => void
+  onDismissOrchestration: () => void
 }
 
 export function DispatchBoard({
@@ -67,9 +71,13 @@ export function DispatchBoard({
   selectedDispatchDate,
   isLoading,
   error,
+  orchestrationResult,
+  isOrchestrating,
   onRefresh,
   onCreate,
   onSelect,
+  onOrchestrate,
+  onDismissOrchestration,
 }: DispatchBoardProps) {
   const hasAnyConsignments = consignments.length > 0
 
@@ -97,6 +105,15 @@ export function DispatchBoard({
               <RefreshCcw size={15} />
             </button>
             <button
+              onClick={onOrchestrate}
+              disabled={isOrchestrating || consignments.filter((c) => c.status === 'unassigned').length === 0}
+              className="inline-flex items-center gap-2 rounded-full bg-[#0f9d58] px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#0b8043] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Auto-assign unassigned consignments to best-fit drivers"
+            >
+              {isOrchestrating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+              Auto-Dispatch
+            </button>
+            <button
               onClick={onCreate}
               className="inline-flex items-center gap-2 rounded-full bg-[#1a73e8] px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#1557b0] transition-colors"
             >
@@ -118,6 +135,65 @@ export function DispatchBoard({
           })}
         </div>
       </div>
+
+      {orchestrationResult && (
+        <div className="mx-4 mt-3 rounded-2xl border border-[#c7d6ef] bg-[#e8f0fe] px-4 py-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-[#202124]">
+              Auto-Dispatch Complete
+            </p>
+            <button
+              onClick={onDismissOrchestration}
+              className="text-xs text-[#5f6368] hover:text-[#202124] transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 font-medium text-green-700">
+              {orchestrationResult.auto_assigned} assigned
+            </span>
+            {orchestrationResult.needs_review > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-700">
+                {orchestrationResult.needs_review} needs review
+              </span>
+            )}
+            {orchestrationResult.no_match > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-1 font-medium text-red-700">
+                {orchestrationResult.no_match} no match
+              </span>
+            )}
+            <span className="text-[#5f6368]">
+              {orchestrationResult.total_consignments} consignments processed
+            </span>
+          </div>
+          {orchestrationResult.plans.filter((p) => p.decision === 'needs_review').length > 0 && (
+            <div className="space-y-1 pt-1">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[#5f6368]">Pending Review</p>
+              {orchestrationResult.plans
+                .filter((p) => p.decision === 'needs_review')
+                .map((plan) => (
+                  <button
+                    key={plan.consignment_id}
+                    onClick={() => onSelect(plan.consignment_id)}
+                    className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-left text-xs hover:border-amber-400 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-[#202124]">{plan.consignment_id}</span>
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 font-medium">
+                        Score {plan.score}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[#5f6368]">
+                      {plan.consignment_summary} — Proposed: {plan.assigned_driver_id ?? 'none'}
+                    </p>
+                    <p className="mt-0.5 text-[#80868b]">{plan.reasoning}</p>
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoading && (
