@@ -1,9 +1,13 @@
 import json
+import logging
 from typing import AsyncIterator, List
 import anthropic
+from fastapi import HTTPException
 from app.config import settings
 from app.models.driver import Driver
 from app.models.ai import ChatMessage
+
+logger = logging.getLogger(__name__)
 
 client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 MODEL = "claude-sonnet-4-6"
@@ -75,12 +79,16 @@ async def get_dispatch_recommendations(
         ],
     )
 
-    raw = response.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    return json.loads(raw.strip())
+    try:
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return json.loads(raw.strip())
+    except (json.JSONDecodeError, IndexError, KeyError) as e:
+        logger.error("Failed to parse dispatch recommendation response: %s", e)
+        raise HTTPException(status_code=502, detail="AI service returned an unexpected response")
 
 
 async def get_cost_insights(drivers: List[Driver]) -> dict:
@@ -145,12 +153,16 @@ async def get_cost_insights(drivers: List[Driver]) -> dict:
         ],
     )
 
-    raw = response.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    insights_data = json.loads(raw.strip())
+    try:
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        insights_data = json.loads(raw.strip())
+    except (json.JSONDecodeError, IndexError, KeyError) as e:
+        logger.error("Failed to parse cost insights response: %s", e)
+        raise HTTPException(status_code=502, detail="AI service returned an unexpected response")
 
     return {"chart_data": chart_data, "insights": insights_data.get("insights", [])}
 

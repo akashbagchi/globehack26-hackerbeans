@@ -1,14 +1,16 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from datetime import datetime, timezone
 from app.models.load import LoadRequest
 from app.services.navpro import get_drivers
 from app.services.claude import get_dispatch_recommendations, get_cost_insights
+from app.limiter import limiter
 
 router = APIRouter(prefix="/dispatch", tags=["dispatch"])
 
 
 @router.post("/recommend")
-async def recommend_dispatch(req: LoadRequest):
+@limiter.limit("10/minute")
+async def recommend_dispatch(request: Request, req: LoadRequest):
     drivers, source = await get_drivers()
     result = await get_dispatch_recommendations(
         drivers, req.pickup, req.destination, req.cargo, req.weight_lbs
@@ -21,7 +23,8 @@ async def recommend_dispatch(req: LoadRequest):
 
 
 @router.get("/cost-insights")
-async def cost_insights():
+@limiter.limit("20/minute")
+async def cost_insights(request: Request):
     drivers, source = await get_drivers()
     result = await get_cost_insights(drivers)
     return {

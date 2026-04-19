@@ -1,12 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 
 class LoadRequest(BaseModel):
-    pickup: str
-    destination: str
-    cargo: str
-    weight_lbs: int
+    pickup: str = Field(..., min_length=1, max_length=100)
+    destination: str = Field(..., min_length=1, max_length=100)
+    cargo: str = Field(..., min_length=1, max_length=200)
+    weight_lbs: int = Field(..., gt=0, lt=150_000)
 
 
 class Coordinate(BaseModel):
