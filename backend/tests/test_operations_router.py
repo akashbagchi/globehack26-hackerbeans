@@ -116,6 +116,39 @@ class OperationsRouterTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["data"]["consignment_id"], "CON001")
 
+    def test_get_consignment_notifications_returns_history(self):
+        mocked_row = {
+            "consignment_id": "CON001",
+            "fleet_id": "fleet_demo",
+            "status": "in_transit",
+        }
+        mocked_notifications = [
+            {
+                "receiver_notification_id": "RNT001",
+                "consignment_id": "CON001",
+                "notification_type": "eta_updated",
+                "delivery_status": "sent",
+            }
+        ]
+
+        with patch.object(
+            operations_module,
+            "get_consignment",
+            new=AsyncMock(return_value=mocked_row),
+        ), patch.object(
+            operations_module,
+            "list_receiver_notifications",
+            new=AsyncMock(return_value=mocked_notifications),
+        ):
+            response = self.client.get(
+                "/operations/consignments/CON001/notifications",
+                params={"fleet_id": "fleet_demo"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["count"], 1)
+        self.assertEqual(response.json()["data"][0]["receiver_notification_id"], "RNT001")
+
     def test_create_consignment_returns_created_envelope(self):
         mocked_row = {
             "consignment_id": "CONNEW1",

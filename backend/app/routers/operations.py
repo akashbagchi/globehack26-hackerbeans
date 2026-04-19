@@ -11,6 +11,7 @@ from app.services.operations import (
     delete_consignment,
     get_consignment,
     get_consignment_timeline,
+    list_receiver_notifications,
     list_assignments,
     list_consignments,
     update_consignment,
@@ -184,6 +185,33 @@ async def get_consignment_events(
 
     return {
         "data": timeline,
+        "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/consignments/{consignment_id}/notifications")
+async def get_consignment_notifications(
+    consignment_id: str,
+    fleet_id: str = Query(...),
+):
+    try:
+        consignment = await get_consignment(fleet_id=fleet_id, consignment_id=consignment_id)
+        if not consignment:
+            raise HTTPException(status_code=404, detail="Consignment not found")
+        notifications = await list_receiver_notifications(
+            fleet_id=fleet_id,
+            consignment_id=consignment_id,
+        )
+    except OperationsServiceNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationsServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "data": notifications,
+        "count": len(notifications),
         "fleet_id": fleet_id,
         "source": "insforge",
         "timestamp": datetime.now(timezone.utc).isoformat(),

@@ -206,7 +206,7 @@ export function DispatchWorkspace() {
         {dispatchMode === 'board' ? (
           selectedConsignmentId === '__new__' || selectedConsignment ? (
             <ConsignmentEditor
-              key={`${selectedConsignmentId ?? 'board'}-${selectedDispatchDate}`}
+              key={`${selectedConsignmentId ?? 'board'}-${selectedDispatchDate}-${refreshKey}`}
               consignment={selectedConsignment}
               dispatchDate={selectedDispatchDate}
               isSaving={isSavingConsignment}

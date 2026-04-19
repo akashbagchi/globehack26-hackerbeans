@@ -194,6 +194,25 @@ export interface ConsignmentPayload {
   receiver_contact_preferences: ConsignmentContactPreference[]
 }
 
+export interface ReceiverNotification {
+  receiver_notification_id: string
+  fleet_id: string
+  consignment_id: string
+  assignment_id: string | null
+  notification_type: string
+  channel: NotificationChannel
+  recipient: string
+  sent_at: string
+  delivery_status: string
+  eta_at: string | null
+  message_template: string | null
+  message_text: string | null
+  context: Record<string, unknown>
+  external_reference: string | null
+  created_at: string
+  updated_at: string
+}
+
 export type OrchestrationDecision = 'auto_assigned' | 'needs_review' | 'no_match'
 
 export interface AssignmentPlan {
