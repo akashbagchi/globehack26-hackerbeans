@@ -227,6 +227,7 @@ export function ConsignmentEditor({
       return
     }
 
+    const activeConsignment = consignment
     let cancelled = false
 
     async function loadNotifications() {
@@ -234,8 +235,8 @@ export function ConsignmentEditor({
       setNotificationError(null)
       try {
         const response = await fetchConsignmentNotifications({
-          fleetId: consignment.fleet_id,
-          consignmentId: consignment.consignment_id,
+          fleetId: activeConsignment.fleet_id,
+          consignmentId: activeConsignment.consignment_id,
         })
         if (!cancelled) {
           setNotifications(response.data)

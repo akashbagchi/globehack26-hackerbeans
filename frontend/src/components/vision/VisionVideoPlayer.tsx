@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { AlertTriangle, LoaderCircle } from 'lucide-react'
 import { seekVideoToDemoStart } from '../../lib/videoPlayback'
 
@@ -22,11 +22,11 @@ export function VisionVideoPlayer({
   autoPlay = true,
 }: VisionVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-
-  useEffect(() => {
-    setStatus('loading')
-  }, [src])
+  const [statusState, setStatusState] = useState<{ src: string; status: 'loading' | 'ready' | 'error' }>({
+    src,
+    status: 'loading',
+  })
+  const status = statusState.src === src ? statusState.status : 'loading'
 
   return (
     <div className={`relative overflow-hidden bg-[#0f172a] ${className ?? ''}`}>
@@ -42,16 +42,19 @@ export function VisionVideoPlayer({
         onLoadedMetadata={(event) => {
           seekVideoToDemoStart(event.currentTarget)
         }}
+        onLoadStart={() => {
+          setStatusState({ src, status: 'loading' })
+        }}
         onCanPlay={(event) => {
-          setStatus('ready')
+          setStatusState({ src, status: 'ready' })
           if (autoPlay) {
             event.currentTarget.play().catch(() => {})
           }
         }}
-        onPlaying={() => setStatus('ready')}
+        onPlaying={() => setStatusState({ src, status: 'ready' })}
         onError={() => {
           console.error(`Vision video failed to load: ${src}`)
-          setStatus('error')
+          setStatusState({ src, status: 'error' })
         }}
       >
         <source src={src} type="video/mp4" />
