@@ -94,7 +94,7 @@ function applyStyles(el: HTMLDivElement, driver: Driver, color: string, isSelect
     : `${riskHalo ? `0 0 0 8px ${riskHalo}, ` : ''}0 1px 3px rgba(0,0,0,0.35)`
   el.style.cursor = 'pointer'
   el.style.animation = riskHalo ? 'markerPulse 1.3s ease-in-out infinite' : pulse ? 'markerPulse 2s ease-in-out infinite' : 'none'
-  el.style.transition = 'width 0.15s, height 0.15s, box-shadow 0.15s'
+  el.style.transition = 'width 0.15s, height 0.15s, box-shadow 0.15s, transform 4s linear'
   // Dot only — no inner content needed
   while (el.firstChild) el.removeChild(el.firstChild)
 }

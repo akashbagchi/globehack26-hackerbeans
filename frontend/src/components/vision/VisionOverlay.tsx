@@ -28,7 +28,7 @@ export function VisionOverlay() {
       {criticalAlert && (
         <button
           onClick={() => setSelectedDriver(criticalAlert.driver_id)}
-          className="absolute left-4 top-4 z-20 flex max-w-md items-start gap-3 rounded-2xl border border-red-300 bg-red-50/95 px-4 py-3 text-left shadow-[0_16px_40px_rgba(220,38,38,0.18)] backdrop-blur animate-pulse"
+          className="absolute left-4 top-4 z-20 flex max-w-md items-start gap-3 rounded-2xl border border-red-300 bg-red-50/95 px-4 py-3 text-left shadow-[0_8px_24px_rgba(220,38,38,0.12)] backdrop-blur"
         >
           <ShieldAlert size={18} className="mt-0.5 shrink-0 text-red-600" />
           <div className="min-w-0">
@@ -83,21 +83,12 @@ export function VisionOverlay() {
         </button>
       )}
 
-      {alerts.length > 0 && (
-        <div className="absolute bottom-4 left-4 z-20 flex max-w-sm flex-col gap-2">
-          {alerts.slice(0, 3).map((alert) => (
-            <button
-              key={`${alert.driver_id}-${alert.detected_at}`}
-              onClick={() => setSelectedDriver(alert.driver_id)}
-              className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-left shadow-sm backdrop-blur ${STATUS_STYLES[alert.status]}`}
-            >
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-              <div className="min-w-0">
-                <div className="text-xs font-semibold text-[#202124]">{alert.driver_name}</div>
-                <div className="text-xs leading-relaxed text-[#5f6368]">{alert.summary}</div>
-              </div>
-            </button>
-          ))}
+      {alerts.length > 1 && (
+        <div className="absolute bottom-4 left-4 z-20">
+          <div className="flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50/90 px-3 py-1.5 text-xs font-medium text-orange-700 backdrop-blur shadow-sm">
+            <AlertTriangle size={12} />
+            {alerts.length - 1} more driver{alerts.length - 1 > 1 ? 's' : ''} flagged
+          </div>
         </div>
       )}
     </>
