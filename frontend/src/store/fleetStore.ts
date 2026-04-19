@@ -9,7 +9,7 @@ interface FleetState {
   simulationResult: SimulationResult | null
   lastUpdated: Date | null
   isLoading: boolean
-  dataSource: 'navpro' | 'mock' | null
+  dataSource: 'navpro' | 'mock' | 'insforge' | null
 
   dispatchRecommendations: DriverRecommendation[]
   dispatchNote: string
@@ -23,7 +23,7 @@ interface FleetState {
   narratorText: string | null
   isSimulating: boolean
 
-  setDrivers: (drivers: Driver[], source: 'navpro' | 'mock') => void
+  setDrivers: (drivers: Driver[], source: 'navpro' | 'mock' | 'insforge') => void
   setSelectedDriver: (id: string | null) => void
   setSimulatedRoute: (route: GeoJSONFeature | null) => void
   setSimulationResult: (result: SimulationResult | null) => void

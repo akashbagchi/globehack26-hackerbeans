@@ -11,7 +11,7 @@ export function useFleetPolling() {
     async function load() {
       try {
         const { drivers, source } = await fetchDrivers()
-        setDrivers(drivers, source as 'navpro' | 'mock')
+        setDrivers(drivers, source as 'navpro' | 'mock' | 'insforge')
       } catch (e) {
         console.error('Fleet poll failed:', e)
       }
