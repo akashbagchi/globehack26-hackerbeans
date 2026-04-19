@@ -10,6 +10,8 @@ import type {
   Consignment,
   ConsignmentPayload,
   ReceiverNotification,
+  ShipmentIntervention,
+  ShipmentInterventionAction,
   TelemetryPosition,
   RouteDeviation,
   GeoJSONFeature,
@@ -26,12 +28,21 @@ export function getToken(): string | null {
   } catch { return null }
 }
 
-const insforgeBaseUrl = process.env.NEXT_PUBLIC_INSFORGE_URL!
-const insforgeAnonKey = process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!
-const operationsBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000'
+const insforgeBaseUrl =
+  process.env.NEXT_PUBLIC_INSFORGE_URL ||
+  process.env.VITE_INSFORGE_URL
+
+const insforgeAnonKey =
+  process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY ||
+  process.env.VITE_INSFORGE_ANON_KEY
+
+const operationsBaseUrl =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.VITE_API_URL ||
+  'http://127.0.0.1:8000'
 const insforge = createClient({
-  baseUrl: insforgeBaseUrl,
-  anonKey: insforgeAnonKey,
+  baseUrl: insforgeBaseUrl ?? 'http://127.0.0.1:8000',
+  anonKey: insforgeAnonKey ?? '',
 })
 
 type DriverApiRecord = Partial<Driver> & {
@@ -87,6 +98,11 @@ function normalizeDriver(raw: DriverApiRecord): Driver {
 }
 
 async function requestInsforge<T>(path: string, init?: RequestInit): Promise<T> {
+  if (!insforgeBaseUrl || !insforgeAnonKey) {
+    throw new Error(
+      'InsForge env is missing. Set NEXT_PUBLIC_INSFORGE_URL and NEXT_PUBLIC_INSFORGE_ANON_KEY, or their VITE_ equivalents.',
+    )
+  }
   const response = await fetch(`${insforgeBaseUrl}${path}`, {
     ...init,
     headers: {
@@ -111,6 +127,19 @@ async function requestInsforge<T>(path: string, init?: RequestInit): Promise<T> 
   }
 
   return response.json() as Promise<T>
+}
+
+function isMissingOptionalTableError(error: unknown) {
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase()
+    return message.includes('(404)') || message.includes('404')
+  }
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as { status?: number; code?: string; message?: string; error?: string }
+    const message = `${candidate.message ?? ''} ${candidate.error ?? ''}`.toLowerCase()
+    return candidate.status === 404 || candidate.code === '404' || message.includes('404')
+  }
+  return false
 }
 
 async function invokeFunction<T>(slug: string, body?: unknown): Promise<T> {
@@ -254,6 +283,106 @@ export async function fetchConsignmentNotifications(params: {
   )
 }
 
+export async function fetchInterventions(params: {
+  fleetId: string
+  status?: string
+}): Promise<{ data: ShipmentIntervention[]; count: number; fleet_id: string }> {
+  const search = new URLSearchParams({ fleet_id: params.fleetId })
+  if (params.status) search.set('status', params.status)
+  return requestOperations(`${operationsBaseUrl}/operations/interventions?${search.toString()}`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  })
+}
+
+export async function fetchInterventionActions(params: {
+  fleetId: string
+  shipmentInterventionId: string
+}): Promise<{ data: ShipmentInterventionAction[]; count: number; fleet_id: string }> {
+  const search = new URLSearchParams({ fleet_id: params.fleetId })
+  return requestOperations(
+    `${operationsBaseUrl}/operations/interventions/${params.shipmentInterventionId}/actions?${search.toString()}`,
+    {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    },
+  )
+}
+
+export async function logInterventionOutreach(params: {
+  fleetId: string
+  shipmentInterventionId: string
+  payload: {
+    dispatcher_id: string
+    contact_channel?: 'email' | 'sms' | 'phone' | 'portal'
+    contact_status: string
+    reason: string
+    notes?: string | null
+    intervention_status?: 'open' | 'action_required' | 'resolved'
+  }
+}): Promise<{ data: { intervention: ShipmentIntervention; action: ShipmentInterventionAction } }> {
+  const search = new URLSearchParams({ fleet_id: params.fleetId })
+  return requestOperations(
+    `${operationsBaseUrl}/operations/interventions/${params.shipmentInterventionId}/outreach?${search.toString()}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(params.payload),
+    },
+  )
+}
+
+export async function applyInterventionReroute(params: {
+  fleetId: string
+  shipmentInterventionId: string
+  payload: {
+    dispatcher_id: string
+    reason: string
+    updated_eta_at?: string
+    estimated_distance_miles?: number
+    estimated_drive_hours?: number
+    status?: 'in_transit' | 'delayed' | 'exception'
+    route_plan_status?: 'draft' | 'approved' | 'active' | 'completed' | 'superseded'
+    mark_intervention_resolved?: boolean
+  }
+}): Promise<{ data: { intervention: ShipmentIntervention; action: ShipmentInterventionAction; consignment: Consignment } }> {
+  const search = new URLSearchParams({ fleet_id: params.fleetId })
+  return requestOperations(
+    `${operationsBaseUrl}/operations/interventions/${params.shipmentInterventionId}/reroute?${search.toString()}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(params.payload),
+    },
+  )
+}
+
+export async function updateRoadsideAssistance(params: {
+  fleetId: string
+  shipmentInterventionId: string
+  payload: {
+    dispatcher_id: string
+    assistance_status: string
+    provider_name?: string
+    external_reference?: string
+    notes?: string | null
+    mark_intervention_resolved?: boolean
+    mark_incident_resolved?: boolean
+  }
+}): Promise<{ data: { intervention: ShipmentIntervention; action: ShipmentInterventionAction } }> {
+  const search = new URLSearchParams({ fleet_id: params.fleetId })
+  return requestOperations(
+    `${operationsBaseUrl}/operations/interventions/${params.shipmentInterventionId}/roadside-assistance?${search.toString()}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(params.payload),
+    },
+  )
+}
+
 export async function createConsignment(payload: ConsignmentPayload): Promise<{ data: Consignment }> {
   return requestOperations(`${operationsBaseUrl}/operations/consignments`, {
     method: 'POST',
@@ -311,12 +440,17 @@ export async function orchestrateDailyDispatch(params: {
 }
 
 export async function fetchAlerts(): Promise<FleetAlert[]> {
-  const { data, error } = await insforge.database
-    .from('fleet_alerts')
-    .select()
-    .order('created_at', { ascending: false })
-  if (error) throw new Error(String(error))
-  return (data ?? []) as unknown as FleetAlert[]
+  try {
+    const { data, error } = await insforge.database
+      .from('fleet_alerts')
+      .select()
+      .order('created_at', { ascending: false })
+    if (error) throw new Error(String(error))
+    return (data ?? []) as unknown as FleetAlert[]
+  } catch (error) {
+    if (isMissingOptionalTableError(error)) return []
+    throw error
+  }
 }
 
 export async function dismissAlert(alertId: string): Promise<void> {
@@ -333,32 +467,49 @@ export async function runReconciliation(): Promise<{ alerts_generated: number; b
 }
 
 export async function fetchTelemetryPositions(): Promise<Record<string, TelemetryPosition>> {
-  const { data, error } = await insforge.database.from('telemetry_positions').select()
-  if (error) throw new Error(String(error))
-  const result: Record<string, TelemetryPosition> = {}
-  for (const row of data ?? []) {
-    result[row.driver_id as string] = row as unknown as TelemetryPosition
+  try {
+    const { data, error } = await insforge.database.from('telemetry_positions').select()
+    if (error) throw new Error(String(error))
+    const result: Record<string, TelemetryPosition> = {}
+    for (const row of data ?? []) {
+      result[row.driver_id as string] = row as unknown as TelemetryPosition
+    }
+    return result
+  } catch (error) {
+    if (isMissingOptionalTableError(error)) return {}
+    throw error
   }
-  return result
 }
 
 export async function fetchTelemetryRoutes(
   opts?: { raw?: boolean },
 ): Promise<RouteRow[] | Record<string, GeoJSONFeature>> {
-  const { data, error } = await insforge.database.from('driver_routes').select()
-  if (error) throw new Error(String(error))
-  if (opts?.raw) return (data ?? []) as RouteRow[]
-  const result: Record<string, GeoJSONFeature> = {}
-  for (const row of data ?? []) {
-    result[row.driver_id as string] = row.geojson as unknown as GeoJSONFeature
+  try {
+    const { data, error } = await insforge.database.from('driver_routes').select()
+    if (error) throw new Error(String(error))
+    if (opts?.raw) return (data ?? []) as RouteRow[]
+    const result: Record<string, GeoJSONFeature> = {}
+    for (const row of data ?? []) {
+      result[row.driver_id as string] = row.geojson as unknown as GeoJSONFeature
+    }
+    return result
+  } catch (error) {
+    if (isMissingOptionalTableError(error)) {
+      return opts?.raw ? [] : {}
+    }
+    throw error
   }
-  return result
 }
 
 export async function fetchTelemetryDeviations(): Promise<RouteDeviation[]> {
-  const { data, error } = await insforge.database.from('route_deviations').select()
-  if (error) throw new Error(String(error))
-  return (data ?? []) as unknown as RouteDeviation[]
+  try {
+    const { data, error } = await insforge.database.from('route_deviations').select()
+    if (error) throw new Error(String(error))
+    return (data ?? []) as unknown as RouteDeviation[]
+  } catch (error) {
+    if (isMissingOptionalTableError(error)) return []
+    throw error
+  }
 }
 
 export async function runVisionMonitor(payload: {
@@ -394,8 +545,12 @@ export function streamChat(
   onDone: () => void,
 ): () => void {
   const controller = new AbortController()
-  const baseUrl = process.env.NEXT_PUBLIC_INSFORGE_URL!
-  const anonKey = process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY!
+  const baseUrl =
+    process.env.NEXT_PUBLIC_INSFORGE_URL ||
+    process.env.VITE_INSFORGE_URL
+  const anonKey =
+    process.env.NEXT_PUBLIC_INSFORGE_ANON_KEY ||
+    process.env.VITE_INSFORGE_ANON_KEY
   const timestamp = new Date().toUTCString()
   const fleetText = buildFleetSummary(drivers)
 
@@ -415,6 +570,12 @@ export function streamChat(
     }
     return { role: m.role as 'user' | 'assistant', content: m.content }
   })
+
+  if (!baseUrl || !anonKey) {
+    onToken('InsForge chat is unavailable because the frontend env vars are missing.')
+    onDone()
+    return () => controller.abort()
+  }
 
   fetch(`${baseUrl}/api/ai/chat/completion`, {
     method: 'POST',

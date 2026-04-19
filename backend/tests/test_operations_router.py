@@ -49,6 +49,127 @@ class OperationsRouterTests(unittest.TestCase):
         self.assertEqual(body["count"], 1)
         self.assertEqual(body["data"][0]["assignment_id"], "ASN001")
 
+    def test_interventions_endpoint_returns_expected_envelope(self):
+        mocked_rows = [
+            {
+                "shipment_intervention_id": "INT001",
+                "fleet_id": "fleet_demo",
+                "category": "route_deviation",
+                "status": "open",
+            }
+        ]
+
+        with patch.object(
+            operations_module,
+            "list_shipment_interventions",
+            new=AsyncMock(return_value=mocked_rows),
+        ):
+            response = self.client.get(
+                "/operations/interventions",
+                params={"fleet_id": "fleet_demo", "status": "open"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["fleet_id"], "fleet_demo")
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(body["data"][0]["shipment_intervention_id"], "INT001")
+
+    def test_intervention_actions_endpoint_returns_expected_envelope(self):
+        mocked_rows = [
+            {
+                "shipment_intervention_action_id": "INA001",
+                "shipment_intervention_id": "INT001",
+                "action_type": "dispatcher_outreach",
+            }
+        ]
+
+        with patch.object(
+            operations_module,
+            "list_shipment_intervention_actions",
+            new=AsyncMock(return_value=mocked_rows),
+        ):
+            response = self.client.get(
+                "/operations/interventions/INT001/actions",
+                params={"fleet_id": "fleet_demo"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["count"], 1)
+        self.assertEqual(
+            response.json()["data"][0]["shipment_intervention_action_id"],
+            "INA001",
+        )
+
+    def test_intervention_outreach_endpoint_returns_not_found_when_missing(self):
+        with patch.object(
+            operations_module,
+            "record_intervention_outreach",
+            new=AsyncMock(return_value=None),
+        ):
+            response = self.client.post(
+                "/operations/interventions/INT404/outreach",
+                params={"fleet_id": "fleet_demo"},
+                json={
+                    "dispatcher_id": "DSP001",
+                    "contact_status": "no_answer",
+                    "reason": "Phone went unanswered",
+                },
+            )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_intervention_reroute_endpoint_returns_expected_envelope(self):
+        mocked_result = {
+            "intervention": {"shipment_intervention_id": "INT001", "status": "resolved"},
+            "action": {"shipment_intervention_action_id": "INA002"},
+            "route_plan": {"route_plan_id": "RTE001"},
+            "consignment": {"consignment_id": "CON001", "status": "delayed"},
+        }
+
+        with patch.object(
+            operations_module,
+            "apply_intervention_reroute",
+            new=AsyncMock(return_value=mocked_result),
+        ):
+            response = self.client.post(
+                "/operations/interventions/INT001/reroute",
+                params={"fleet_id": "fleet_demo"},
+                json={
+                    "dispatcher_id": "DSP001",
+                    "reason": "Weather delay around I-40",
+                    "updated_eta_at": "2026-04-19T19:30:00Z",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["route_plan"]["route_plan_id"], "RTE001")
+
+    def test_roadside_assistance_endpoint_returns_expected_envelope(self):
+        mocked_result = {
+            "intervention": {"shipment_intervention_id": "INT001", "status": "resolved"},
+            "action": {"shipment_intervention_action_id": "INA003"},
+            "roadside_incident": {"roadside_incident_id": "RSI001"},
+        }
+
+        with patch.object(
+            operations_module,
+            "update_roadside_assistance",
+            new=AsyncMock(return_value=mocked_result),
+        ):
+            response = self.client.post(
+                "/operations/interventions/INT001/roadside-assistance",
+                params={"fleet_id": "fleet_demo"},
+                json={
+                    "dispatcher_id": "DSP001",
+                    "assistance_status": "provider_dispatched",
+                    "provider_name": "Acme Roadside",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["roadside_incident"]["roadside_incident_id"], "RSI001")
+
     def test_operational_history_endpoint_returns_expected_envelope(self):
         mocked_report = {
             "filters": {"fleet_id": "fleet_demo", "origin": "Phoenix, AZ"},

@@ -40,6 +40,12 @@ class RoutePlanStatus(str, Enum):
     superseded = "superseded"
 
 
+class ShipmentInterventionStatus(str, Enum):
+    open = "open"
+    action_required = "action_required"
+    resolved = "resolved"
+
+
 class IncidentSeverity(str, Enum):
     low = "low"
     medium = "medium"
@@ -385,6 +391,36 @@ class ReceiverNotification(AuditFields):
     message_text: Optional[str] = None
     context: dict = Field(default_factory=dict)
     external_reference: Optional[str] = None
+
+
+class ShipmentInterventionOutreachUpdate(BaseModel):
+    dispatcher_id: str
+    contact_channel: NotificationChannel = NotificationChannel.phone
+    contact_status: str
+    reason: str
+    notes: Optional[str] = None
+    intervention_status: Optional[ShipmentInterventionStatus] = None
+
+
+class ShipmentInterventionRerouteUpdate(BaseModel):
+    dispatcher_id: str
+    reason: str
+    updated_eta_at: Optional[datetime] = None
+    estimated_distance_miles: Optional[float] = Field(default=None, gt=0)
+    estimated_drive_hours: Optional[float] = Field(default=None, gt=0)
+    status: Optional[ConsignmentStatus] = None
+    route_plan_status: RoutePlanStatus = RoutePlanStatus.active
+    mark_intervention_resolved: bool = True
+
+
+class ShipmentInterventionRoadsideUpdate(BaseModel):
+    dispatcher_id: str
+    assistance_status: str
+    provider_name: Optional[str] = None
+    external_reference: Optional[str] = None
+    notes: Optional[str] = None
+    mark_intervention_resolved: bool = False
+    mark_incident_resolved: bool = False
 
 
 class ReconciliationEvent(AuditFields):

@@ -213,6 +213,65 @@ export interface ReceiverNotification {
   updated_at: string
 }
 
+export type ShipmentInterventionCategory =
+  | 'route_deviation'
+  | 'traffic_delay'
+  | 'weather'
+  | 'incident'
+  | 'construction'
+  | 'hos_risk'
+  | 'breakdown'
+
+export type ShipmentInterventionSeverity = 'low' | 'medium' | 'high' | 'critical'
+export type ShipmentInterventionStatus = 'open' | 'action_required' | 'resolved'
+
+export interface ShipmentIntervention {
+  shipment_intervention_id: string
+  fleet_id: string
+  consignment_id: string | null
+  assignment_id: string | null
+  driver_id: string | null
+  truck_id: string | null
+  category: ShipmentInterventionCategory
+  trigger_event_type: string
+  summary: string
+  severity: ShipmentInterventionSeverity
+  status: ShipmentInterventionStatus
+  dispatcher_cta: {
+    primary_action?: string
+    secondary_action?: string
+    label?: string
+  }
+  recommended_route_action: {
+    action?: string
+    policy?: string
+    recommended_eta?: string | null
+    applied_at?: string | null
+    applied_by?: string | null
+    resolution?: string | null
+  } | null
+  roadside_incident_id: string | null
+  latest_event_at: string
+  details: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface ShipmentInterventionAction {
+  shipment_intervention_action_id: string
+  shipment_intervention_id: string
+  fleet_id: string
+  dispatcher_id: string | null
+  action_type: 'dispatcher_outreach' | 'reroute_applied' | 'roadside_assistance'
+  action_status: string
+  action_reason: string | null
+  notes: string | null
+  metadata: Record<string, unknown>
+  occurred_at: string
+  created_at: string
+  updated_at: string
+}
+
 export type OrchestrationDecision = 'auto_assigned' | 'needs_review' | 'no_match'
 
 export interface AssignmentPlan {

@@ -5,6 +5,7 @@ import { RefreshCw, X, Clock, CreditCard, AlertTriangle, Truck, Navigation } fro
 import { useFleetStore } from '../../store/fleetStore'
 import { fetchAlerts, dismissAlert, runReconciliation } from '../../api/client'
 import type { FleetAlert } from '../../types'
+import { InterventionQueue } from './InterventionQueue'
 
 const TYPE_CONFIG: Record<FleetAlert['alert_type'], { label: string; Icon: LucideIcon }> = {
   late_delivery:       { label: 'Late Delivery',       Icon: Clock },
@@ -92,6 +93,7 @@ export function AlertsPanel() {
 
   return (
     <div className="flex flex-col h-full">
+      <InterventionQueue />
       {/* Header */}
       <div className="px-4 py-3 border-b border-[#dadce0] shrink-0">
         <div className="flex items-center justify-between mb-2">

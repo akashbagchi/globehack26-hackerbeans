@@ -2,7 +2,12 @@ import { useEffect, useRef } from 'react'
 import mapboxgl from 'mapbox-gl'
 import { useUIStore } from '../store/uiStore'
 
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || ''
+const mapboxToken =
+  process.env.NEXT_PUBLIC_MAPBOX_TOKEN ||
+  process.env.VITE_MAPBOX_TOKEN ||
+  ''
+
+mapboxgl.accessToken = mapboxToken
 
 export function useMapbox(containerRef: React.RefObject<HTMLDivElement | null>) {
   const mapRef = useRef<mapboxgl.Map | null>(null)
@@ -10,6 +15,10 @@ export function useMapbox(containerRef: React.RefObject<HTMLDivElement | null>) 
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
+    if (!mapboxToken) {
+      console.warn('Mapbox token is missing. Skipping map initialization.')
+      return
+    }
 
     const map = new mapboxgl.Map({
       container: containerRef.current,

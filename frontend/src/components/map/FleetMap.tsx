@@ -19,6 +19,9 @@ export function FleetMap() {
   const drivers = useFleetStore((s) => s.drivers)
   const simulationResult = useFleetStore((s) => s.simulationResult)
   const [map, setMap] = useState<mapboxgl.Map | null>(null)
+  const hasMapboxToken = Boolean(
+    process.env.NEXT_PUBLIC_MAPBOX_TOKEN || process.env.VITE_MAPBOX_TOKEN,
+  )
 
   useEffect(() => {
     if (mapReady && mapRef.current) {
@@ -50,6 +53,16 @@ export function FleetMap() {
   return (
     <div className="relative w-full h-full">
       <div ref={containerRef} className="w-full h-full" />
+      {!hasMapboxToken && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#0b1020] px-6 text-center">
+          <div className="max-w-md rounded-3xl border border-[#24324f] bg-[#11182b]/90 p-6 text-white shadow-2xl">
+            <p className="text-lg font-semibold">Map unavailable</p>
+            <p className="mt-2 text-sm text-[#b9c4dd]">
+              Set `NEXT_PUBLIC_MAPBOX_TOKEN` or `VITE_MAPBOX_TOKEN` in `frontend/.env` and restart the frontend.
+            </p>
+          </div>
+        </div>
+      )}
       {mapReady && map && (
         <>
           <TruckModelLayer map={map} />

@@ -7,11 +7,18 @@ from app.models.events import (
     BreakdownEvent,
     FleetEvent,
     HOSThresholdWarningEvent,
+    OperationalExceptionEvent,
     ReceiverNotificationEvent,
     RouteDeviationEvent,
     TelemetryUpdateEvent,
 )
 from app.services.event_bus import FleetEventBus
+from app.services.interventions import (
+    create_breakdown_intervention,
+    create_hos_risk_intervention,
+    create_operational_exception_intervention,
+    create_route_deviation_intervention,
+)
 from app.services.operations import create_route_event_notification
 
 logger = logging.getLogger(__name__)
@@ -56,6 +63,7 @@ async def _watch_hos_alerts(event: FleetEvent) -> None:
         event.payload.driver_id,
         event.payload.drive_remaining_hrs,
     )
+    await create_hos_risk_intervention(event)
 
 
 async def _watch_route_deviations(event: FleetEvent) -> None:
@@ -68,6 +76,7 @@ async def _watch_route_deviations(event: FleetEvent) -> None:
         event.payload.deviation_miles,
         event.payload.corridor,
     )
+    await create_route_deviation_intervention(event)
     await create_route_event_notification(
         fleet_id=event.fleet_id,
         assignment_id=event.payload.assignment_id,
@@ -88,6 +97,7 @@ async def _watch_route_deviations(event: FleetEvent) -> None:
 async def _watch_breakdown_notifications(event: FleetEvent) -> None:
     if not isinstance(event, BreakdownEvent):
         return
+    await create_breakdown_intervention(event)
     await create_route_event_notification(
         fleet_id=event.fleet_id,
         assignment_id=None,
@@ -113,6 +123,18 @@ async def _watch_receiver_notifications(event: FleetEvent) -> None:
     )
 
 
+async def _watch_operational_exceptions(event: FleetEvent) -> None:
+    if not isinstance(event, OperationalExceptionEvent):
+        return
+    logger.warning(
+        "operational exception [%s] driver=%s %s",
+        event.payload.category,
+        event.payload.driver_id,
+        event.payload.summary,
+    )
+    await create_operational_exception_intervention(event)
+
+
 def register_core_consumers(bus: FleetEventBus) -> None:
     bus.register_handler("telemetry.update.v1", _log_event)
     bus.register_handler("telemetry.update.v1", _watch_telemetry)
@@ -120,6 +142,8 @@ def register_core_consumers(bus: FleetEventBus) -> None:
     bus.register_handler("assignment.decision_made.v1", _watch_assignment_decisions)
     bus.register_handler("hos.threshold_warning.v1", _log_event)
     bus.register_handler("hos.threshold_warning.v1", _watch_hos_alerts)
+    bus.register_handler("operational.exception_detected.v1", _log_event)
+    bus.register_handler("operational.exception_detected.v1", _watch_operational_exceptions)
     bus.register_handler("breakdown.reported.v1", _log_event)
     bus.register_handler("breakdown.reported.v1", _watch_breakdowns)
     bus.register_handler("breakdown.reported.v1", _watch_breakdown_notifications)

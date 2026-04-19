@@ -68,6 +68,18 @@ class BreakdownPayload(BaseModel):
     summary: str
 
 
+class OperationalExceptionPayload(BaseModel):
+    assignment_id: str | None = None
+    driver_id: str
+    category: Literal["traffic_delay", "weather", "incident", "construction"]
+    severity: str = "medium"
+    summary: str
+    eta_shift_minutes: int = 0
+    lat: float | None = None
+    lng: float | None = None
+    policy: Literal["dispatcher_review_required", "auto_apply_allowed"] = "dispatcher_review_required"
+
+
 class AssignmentDecisionPayload(BaseModel):
     pickup: str
     destination: str
@@ -123,6 +135,11 @@ class BreakdownEvent(FleetEventEnvelope):
     payload: BreakdownPayload
 
 
+class OperationalExceptionEvent(FleetEventEnvelope):
+    event_type: Literal["operational.exception_detected.v1"] = "operational.exception_detected.v1"
+    payload: OperationalExceptionPayload
+
+
 class AssignmentDecisionEvent(FleetEventEnvelope):
     event_type: Literal["assignment.decision_made.v1"] = "assignment.decision_made.v1"
     payload: AssignmentDecisionPayload
@@ -145,6 +162,7 @@ FleetEvent = Union[
     CardTransactionEvent,
     DriverCheckInEvent,
     BreakdownEvent,
+    OperationalExceptionEvent,
     AssignmentDecisionEvent,
     OrchestrationCompletedEvent,
     ReceiverNotificationEvent,

@@ -2,8 +2,21 @@ from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
-from app.models.domain import ConsignmentCreate, ConsignmentUpdate
+from app.models.domain import (
+    ConsignmentCreate,
+    ConsignmentUpdate,
+    ShipmentInterventionOutreachUpdate,
+    ShipmentInterventionRoadsideUpdate,
+    ShipmentInterventionRerouteUpdate,
+)
 from app.services.dispatch_scoring import build_dispatch_scoring_signals
+from app.services.interventions import (
+    apply_intervention_reroute,
+    list_shipment_intervention_actions,
+    list_shipment_interventions,
+    record_intervention_outreach,
+    update_roadside_assistance,
+)
 from app.services.navpro import get_drivers
 from app.services.operational_analytics import (
     get_fleet_performance_report,
@@ -299,6 +312,146 @@ async def get_assignments(
     return {
         "data": assignments,
         "count": len(assignments),
+        "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/interventions")
+async def get_interventions(
+    fleet_id: str = Query(...),
+    status: str | None = Query(default=None),
+    consignment_id: str | None = Query(default=None),
+    assignment_id: str | None = Query(default=None),
+):
+    try:
+        interventions = await list_shipment_interventions(
+            fleet_id=fleet_id,
+            status=status,
+            consignment_id=consignment_id,
+            assignment_id=assignment_id,
+        )
+    except OperationsServiceNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationsServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "data": interventions,
+        "count": len(interventions),
+        "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/interventions/{shipment_intervention_id}/actions")
+async def get_intervention_actions(
+    shipment_intervention_id: str,
+    fleet_id: str = Query(...),
+):
+    try:
+        actions = await list_shipment_intervention_actions(
+            fleet_id=fleet_id,
+            shipment_intervention_id=shipment_intervention_id,
+        )
+    except OperationsServiceNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationsServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "data": actions,
+        "count": len(actions),
+        "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/interventions/{shipment_intervention_id}/outreach")
+async def post_intervention_outreach(
+    shipment_intervention_id: str,
+    payload: ShipmentInterventionOutreachUpdate,
+    fleet_id: str = Query(...),
+):
+    try:
+        result = await record_intervention_outreach(
+            fleet_id=fleet_id,
+            shipment_intervention_id=shipment_intervention_id,
+            payload=payload,
+        )
+    except OperationsServiceNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationsServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Intervention not found")
+
+    return {
+        "data": result,
+        "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/interventions/{shipment_intervention_id}/reroute")
+async def post_intervention_reroute(
+    shipment_intervention_id: str,
+    payload: ShipmentInterventionRerouteUpdate,
+    fleet_id: str = Query(...),
+):
+    try:
+        result = await apply_intervention_reroute(
+            fleet_id=fleet_id,
+            shipment_intervention_id=shipment_intervention_id,
+            payload=payload,
+        )
+    except OperationsServiceNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationsServiceConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except OperationsServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Intervention not found")
+
+    return {
+        "data": result,
+        "fleet_id": fleet_id,
+        "source": "insforge",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.post("/interventions/{shipment_intervention_id}/roadside-assistance")
+async def post_roadside_assistance(
+    shipment_intervention_id: str,
+    payload: ShipmentInterventionRoadsideUpdate,
+    fleet_id: str = Query(...),
+):
+    try:
+        result = await update_roadside_assistance(
+            fleet_id=fleet_id,
+            shipment_intervention_id=shipment_intervention_id,
+            payload=payload,
+        )
+    except OperationsServiceNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except OperationsServiceConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except OperationsServiceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    if not result:
+        raise HTTPException(status_code=404, detail="Intervention not found")
+
+    return {
+        "data": result,
         "fleet_id": fleet_id,
         "source": "insforge",
         "timestamp": datetime.now(timezone.utc).isoformat(),
