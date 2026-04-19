@@ -32,16 +32,16 @@ export function DriverMatch({ rec }: DriverMatchProps) {
       <div className="grid grid-cols-3 gap-1 mb-2 text-center">
         <div className="bg-white rounded-lg p-1.5">
           <div className="text-[9px] text-gray-400">Distance</div>
-          <div className="text-xs font-semibold text-gray-700">{rec.distance_to_pickup_miles.toFixed(0)}mi</div>
+          <div className="text-xs font-semibold text-gray-700">{(rec.distance_to_pickup_miles ?? 0).toFixed(0)}mi</div>
         </div>
         <div className="bg-white rounded-lg p-1.5">
           <div className="text-[9px] text-gray-400">HOS Left</div>
-          <div className="text-xs font-semibold text-gray-700">{rec.hos_remaining_hrs.toFixed(1)}h</div>
+          <div className="text-xs font-semibold text-gray-700">{(rec.hos_remaining_hrs ?? 0).toFixed(1)}h</div>
         </div>
         <div className="bg-white rounded-lg p-1.5">
           <div className="text-[9px] text-gray-400">vs Avg</div>
-          <div className={`text-xs font-bold ${rec.cost_delta_vs_avg <= 0 ? 'text-green-600' : 'text-red-500'}`}>
-            {rec.cost_delta_vs_avg > 0 ? '+' : ''}{rec.cost_delta_vs_avg.toFixed(2)}/mi
+          <div className={`text-xs font-bold ${(rec.cost_delta_vs_avg ?? 0) <= 0 ? 'text-green-600' : 'text-red-500'}`}>
+            {(rec.cost_delta_vs_avg ?? 0) > 0 ? '+' : ''}{(rec.cost_delta_vs_avg ?? 0).toFixed(2)}/mi
           </div>
         </div>
       </div>
